@@ -1,0 +1,4 @@
+PRODUCT_NAME = "$(TARGET_NAME)";
+PRODUCT_BUNDLE_IDENTIFIER = "com.votredomaine.IndyCrm";
+PRODUCT_MODULE_NAME = "IndyCrm";
+INFOPLIST_KEY_CFBundleDisplayName = "IndyCrm"; 

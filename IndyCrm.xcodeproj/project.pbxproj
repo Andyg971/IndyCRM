@@ -27,6 +27,7 @@
 		ED40EF9C2D63520400A897C8 /* IndyCrm.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IndyCrm.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED40EFAC2D63520400A897C8 /* IndyCrmTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = IndyCrmTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED40EFB62D63520500A897C8 /* IndyCrmUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = IndyCrmUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		ED6B4DA12D635D9E0077ED52 /* IndyCrm.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = IndyCrm.xcodeproj; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -89,6 +90,11 @@
 				ED40EFAC2D63520400A897C8 /* IndyCrmTests.xctest */,
 				ED40EFB62D63520500A897C8 /* IndyCrmUITests.xctest */,
 			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		ED6B4DA22D635D9E0077ED52 /* Products */ = {
+			isa = PBXGroup;
 			name = Products;
 			sourceTree = "<group>";
 		};
@@ -558,6 +564,22 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+		1234567890ABCDEF = {
+			isa = XCRemoteSwiftPackageReference;
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 7.0.0;
+			};
+		};
+		
+		1234567890ABCDE1 = {
+			isa = XCSwiftPackageProductDependency;
+		};
+		
+		1234567890ABCDE2 = {
+			isa = XCSwiftPackageProductDependency;
+		};
 	};
 	rootObject = ED40EF942D63520400A897C8 /* Project object */;
 }
