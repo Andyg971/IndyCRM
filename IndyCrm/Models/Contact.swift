@@ -76,4 +76,13 @@ public enum ContactType: String, Codable, CaseIterable {
     case prospect
     case supplier
     case partner
+    
+    var localizedName: String {
+        switch self {
+        case .client: return NSLocalizedString("contacts.type.client", comment: "Client contact type")
+        case .prospect: return NSLocalizedString("contacts.type.prospect", comment: "Prospect contact type")
+        case .supplier: return NSLocalizedString("contacts.type.supplier", comment: "Supplier contact type")
+        case .partner: return NSLocalizedString("contacts.type.partner", comment: "Partner contact type")
+        }
+    }
 } 

@@ -1,0 +1,21 @@
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fond transparent -->
+  <rect width="200" height="200" fill="transparent"/>
+  
+  <!-- Cercle de la tête -->
+  <circle cx="100" cy="80" r="50" fill="url(#purpleGradient)"/>
+  
+  <!-- Partie carte -->
+  <rect x="30" y="140" width="140" height="80" rx="15" fill="url(#purpleGradient)"/>
+  
+  <!-- Détail de la carte -->
+  <rect x="40" y="160" width="30" height="20" rx="5" fill="#f8c8ff" opacity="0.7"/>
+  
+  <!-- Dégradé violet -->
+  <defs>
+    <linearGradient id="purpleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#b64aff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6b4aff;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+</svg>

@@ -64,7 +64,9 @@ struct ContactListView: View {
                         // Afficher une alerte d'erreur
                         showDeletionErrorAlert(for: contact)
                     } else {
-                        contactsManager.deleteContact(contact)
+                        Task {
+                            await contactsManager.deleteContact(contact)
+                        }
                     }
                 }
             }

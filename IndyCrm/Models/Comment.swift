@@ -1,6 +1,8 @@
 import Foundation
 
-public struct Comment: Identifiable, Codable {
+// Conforme à Hashable pour permettre son utilisation dans des collections comme Set ou comme clé de dictionnaire,
+// et pour permettre la conformité automatique de `Milestone` à Hashable.
+public struct Comment: Identifiable, Codable, Hashable {
     public let id: UUID
     public let text: String
     public let date: Date

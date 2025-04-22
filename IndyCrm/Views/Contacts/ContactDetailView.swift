@@ -16,7 +16,7 @@ struct ContactDetailView: View {
             }
             
             Section(header: Text("Statut")) {
-                LabeledContent("Type", value: contact.type.rawValue)
+                LabeledContent("Type", value: contact.type.localizedName)
                 LabeledContent("Statut professionnel", value: contact.employmentStatus.rawValue)
             }
             

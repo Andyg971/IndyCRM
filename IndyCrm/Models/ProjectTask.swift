@@ -16,7 +16,7 @@ public struct TimeEntry: Identifiable, Codable {
     }
 }
 
-public struct ProjectTask: Identifiable, Codable {
+public struct ProjectTask: Identifiable, Codable, Hashable {
     public let id: UUID
     public let title: String
     public let description: String
@@ -24,11 +24,13 @@ public struct ProjectTask: Identifiable, Codable {
     public var priority: Priority
     public var dueDate: Date?
     public var assignedTo: UUID?
-    public let estimatedHours: Double?
-    public var workedHours: Double
+    public var estimatedHours: Double?
+    public var workedHours: Double = 0.0
     public var isCompleted: Bool
     public var comments: [Comment]
     public var timeEntries: [TimeEntry]
+    public var createdAt: Date? // Optional for backward compatibility
+    public var updatedAt: Date? // Add modification date tracking
     
     public var progress: Double {
         if isCompleted { return 1.0 }
@@ -53,7 +55,9 @@ public struct ProjectTask: Identifiable, Codable {
         estimatedHours: Double? = nil,
         workedHours: Double = 0,
         comments: [Comment] = [],
-        timeEntries: [TimeEntry] = []
+        timeEntries: [TimeEntry] = [],
+        createdAt: Date? = nil,
+        updatedAt: Date? = nil
     ) {
         self.id = id
         self.title = title
@@ -67,5 +71,16 @@ public struct ProjectTask: Identifiable, Codable {
         self.workedHours = workedHours
         self.comments = comments
         self.timeEntries = timeEntries
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+    
+    // MARK: - Hashable Implementation
+    public static func == (lhs: ProjectTask, rhs: ProjectTask) -> Bool {
+        lhs.id == rhs.id
+    }
+    
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 } 

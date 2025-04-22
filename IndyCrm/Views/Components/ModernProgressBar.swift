@@ -3,6 +3,7 @@ import SwiftUI
 public struct ModernProgressBar: View {
     let progress: Double
     let isPaused: Bool
+    let height: CGFloat
     
     private var progressColor: LinearGradient {
         if isPaused {
@@ -76,13 +77,14 @@ public struct ModernProgressBar: View {
                 .animation(.none, value: progress)
             }
         }
-        .frame(height: 24)
+        .frame(height: height)
         .shadow(color: Color.black.opacity(0.1), radius: 4, y: 2)
     }
     
-    public init(progress: Double, isPaused: Bool = false) {
+    public init(progress: Double, isPaused: Bool = false, height: CGFloat = 8) {
         self.progress = min(max(progress, 0), 1)
         self.isPaused = isPaused
+        self.height = height
     }
 }
 

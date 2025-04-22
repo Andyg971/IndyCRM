@@ -3,79 +3,229 @@ import SwiftUI
 struct ProjectsListView: View {
     @ObservedObject var projectManager: ProjectManager
     @ObservedObject var contactsManager: ContactsManager
-    @StateObject private var collaborationService = CollaborationService()
-    @State private var showingNewProject = false
+    @ObservedObject var collaborationService: CollaborationService
+    @ObservedObject var helpService: HelpService
+    @ObservedObject var alertService: AlertService
     @State private var searchText = ""
     @State private var selectedStatus: ProjectStatus?
+    @State private var showingNewProject = false
+    @State private var showingExportOptions = false
+    @StateObject private var exportService = ExportService()
+    @State private var showingShareSheet = false
+    @State private var exportURL: URL?
     
-    var filteredProjects: [Project] {
-        var projects = projectManager.projects
-        
-        if !searchText.isEmpty {
-            projects = projects.filter { project in
-                project.name.localizedCaseInsensitiveContains(searchText) ||
-                contactsManager.contacts.first { $0.id == project.clientId }?.fullName.localizedCaseInsensitiveContains(searchText) ?? false
-            }
-        }
-        
-        if let status = selectedStatus {
-            projects = projects.filter { $0.status == status }
-        }
-        
-        return projects
-    }
-    
-    var body: some View {
-        // Décomposons la vue en sous-vues plus petites
-        ProjectListContainer(
-            projects: filteredProjects,
-            showingNewProject: $showingNewProject,
-            selectedStatus: $selectedStatus,
-            projectManager: projectManager,
-            contactsManager: contactsManager,
-            collaborationService: collaborationService
-        )
-        .searchable(text: $searchText, prompt: "Rechercher un projet")
-        .navigationTitle("Projets")
-        .sheet(isPresented: $showingNewProject) {
-            NavigationView {
-                ProjectFormView(projectManager: projectManager, contactsManager: contactsManager)
-                    .navigationBarTitleDisplayMode(.inline)
-            }
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
-        }
-    }
-}
-
-// Sous-vue pour le conteneur principal
-private struct ProjectListContainer: View {
-    let projects: [Project]
-    @Binding var showingNewProject: Bool
-    @Binding var selectedStatus: ProjectStatus?
-    let projectManager: ProjectManager
-    let contactsManager: ContactsManager
-    let collaborationService: CollaborationService
+    // Variables d'état pour les actions swipe
+    @State private var projectToDelete: Project? = nil
+    @State private var showingDeleteConfirm = false
+    @State private var editingProject: Project? = nil // Pour la sheet d'édition
     
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
-                StatusFilterBar(selectedStatus: $selectedStatus)
-                ProjectsList(
-                    projects: projects,
-                    projectManager: projectManager,
-                    contactsManager: contactsManager,
-                    collaborationService: collaborationService
-                )
+                FilterBarView(searchText: $searchText, selectedStatus: $selectedStatus)
+                
+                List {
+                    ForEach(filteredProjects) { project in
+                        NavigationLink(destination: ProjectDetailView(viewModel: ProjectDetailViewModel(project: project, projectManager: projectManager))) {
+                            ProjectRow(
+                                project: project,
+                                projectManager: projectManager,
+                                contactsManager: contactsManager,
+                                collaborationService: collaborationService,
+                                helpService: helpService,
+                                alertService: alertService
+                            )
+                        }
+                        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                            Button {
+                                toggleFavoriteStatus(project: project)
+                            } label: {
+                                Label(project.isFavorite ? "Unfavorite" : "Favorite", systemImage: project.isFavorite ? "heart.slash.fill" : "heart.fill")
+                            }
+                            .tint(project.isFavorite ? .gray : .pink)
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                projectToDelete = project // Définir le projet pour confirmation
+                                showingDeleteConfirm = true // Afficher l'alerte de confirmation
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                            Button {
+                                editingProject = project // Définir le projet pour la sheet d'édition
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+                            .tint(.blue)
+                        }
+                    }
+                    .onDelete(perform: deleteProjects)
+                }
             }
             
-            AddProjectButton(showingNewProject: $showingNewProject)
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button(action: { showingNewProject = true }) {
+                        Image(systemName: "plus.circle.fill")
+                            .resizable()
+                            .frame(width: 50, height: 50)
+                            .foregroundColor(.indigo)
+                            .background(Color.white)
+                            .clipShape(Circle())
+                            .shadow(radius: 4)
+                    }
+                    .padding()
+                }
+            }
+        }
+        .navigationTitle("Projets")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button(action: exportToCSV) {
+                        Label("Exporter en CSV", systemImage: "doc.text")
+                    }
+                    
+                    Button(action: exportToVCard) {
+                        Label("Exporter en vCard", systemImage: "person.crop.rectangle")
+                    }
+                    
+                    Button(action: exportToExcel) {
+                        Label("Exporter en Excel", systemImage: "tablecells")
+                    }
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+            }
+        }
+        .accentColor(.indigo)
+        .sheet(isPresented: $showingNewProject) {
+            NavigationView {
+                ProjectFormView(
+                    projectManager: projectManager,
+                    contactsManager: contactsManager
+                )
+            }
+        }
+        // Sheet pour éditer un projet existant
+        .sheet(item: $editingProject) { projectToEdit in
+             NavigationView {
+                 ProjectFormView(
+                     projectManager: projectManager,
+                     contactsManager: contactsManager,
+                     editingProject: projectToEdit // Pass the unwrapped project using the correct parameter name
+                 )
+             }
+         }
+        .sheet(isPresented: $showingShareSheet) {
+            if let url = exportURL {
+                SystemShareSheet(items: [url])
+            }
+        }
+        .alert("Confirmer la suppression", isPresented: $showingDeleteConfirm) {
+            Button("Annuler", role: .cancel) {}
+            Button("Supprimer", role: .destructive) {
+                if let project = projectToDelete {
+                    Task {
+                        // Utiliser await pour s'assurer que l'opération asynchrone se termine correctement
+                        await projectManager.deleteProject(project)
+                        // Réinitialiser l'état après la suppression
+                        projectToDelete = nil
+                    }
+                }
+            }
+        } message: {
+            Text("Êtes-vous sûr de vouloir supprimer ce projet ? Cette action est irréversible.")
+        }
+    }
+    
+    private var filteredProjects: [Project] {
+        var projects = projectManager.projects
+        
+        if let selectedStatus = selectedStatus {
+            projects = projects.filter { $0.status == selectedStatus }
+        }
+        
+        if !searchText.isEmpty {
+            projects = projects.filter {
+                $0.name.localizedCaseInsensitiveContains(searchText) ||
+                $0.notes.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+        
+        return projects.sorted { $0.name < $1.name }
+    }
+    
+    private func deleteProjects(at offsets: IndexSet) {
+        let projectsToDelete = offsets.map { filteredProjects[$0] }
+        Task {
+            for project in projectsToDelete {
+                // Utiliser await pour s'assurer que chaque suppression se termine correctement
+                await projectManager.deleteProject(project)
+            }
+        }
+    }
+    
+    private func exportToCSV() {
+        if let url = exportService.exportToCSV(.projects, projects: projectManager.projects) {
+            exportURL = url
+            showingShareSheet = true
+        } else {
+            alertService.createAlert(
+                type: .error,
+                title: "Erreur d'export",
+                message: "Une erreur est survenue lors de l'export CSV",
+                severity: .medium
+            )
+        }
+    }
+    
+    private func exportToVCard() {
+        if let url = exportService.exportToVCard(contacts: contactsManager.contacts) {
+            exportURL = url
+            showingShareSheet = true
+        } else {
+            alertService.createAlert(
+                type: .error,
+                title: "Erreur d'export",
+                message: "Une erreur est survenue lors de l'export vCard",
+                severity: .medium
+            )
+        }
+    }
+    
+    private func exportToExcel() {
+        if let url = exportService.exportToExcel(.projects, projects: projectManager.projects) {
+            exportURL = url
+            showingShareSheet = true
+        } else {
+            alertService.createAlert(
+                type: .error,
+                title: "Erreur d'export",
+                message: "Une erreur est survenue lors de l'export Excel",
+                severity: .medium
+            )
+        }
+    }
+    
+    // Fonction pour basculer le statut favori
+    private func toggleFavoriteStatus(project: Project) {
+        Task {
+            var updatedProject = project
+            updatedProject.isFavorite.toggle()
+            updatedProject.updatedAt = Date()
+            await projectManager.updateProject(updatedProject)
+            // Gérer les erreurs si nécessaire avec alertService
         }
     }
 }
 
-// Sous-vue pour la barre de filtres
-private struct StatusFilterBar: View {
+// MARK: - Sous-composants
+private struct FilterBarView: View {
+    @Binding var searchText: String
     @Binding var selectedStatus: ProjectStatus?
     
     var body: some View {
@@ -95,67 +245,6 @@ private struct StatusFilterBar: View {
     }
 }
 
-// Sous-vue pour la liste des projets
-private struct ProjectsList: View {
-    let projects: [Project]
-    let projectManager: ProjectManager
-    let contactsManager: ContactsManager
-    let collaborationService: CollaborationService
-    
-    var body: some View {
-        List {
-            ForEach(projects) { project in
-                NavigationLink(destination: ProjectDetailView(
-                    project: project,
-                    projectManager: projectManager,
-                    contactsManager: contactsManager,
-                    collaborationService: collaborationService
-                )) {
-                    ProjectRowView(
-                        project: project,
-                        contact: contactsManager.contacts.first { $0.id == project.clientId }
-                    )
-                }
-            }
-            .onDelete { indexSet in
-                for index in indexSet {
-                    projectManager.deleteProject(projects[index])
-                }
-            }
-        }
-        .listStyle(.plain)
-    }
-}
-
-// Sous-vue pour le bouton d'ajout
-private struct AddProjectButton: View {
-    @Binding var showingNewProject: Bool
-    
-    var body: some View {
-        VStack {
-            Spacer()
-            HStack {
-                Spacer()
-                Button(action: {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        showingNewProject = true
-                    }
-                }) {
-                    Image(systemName: "plus")
-                        .font(.title2.bold())
-                        .foregroundColor(.white)
-                        .frame(width: 60, height: 60)
-                        .background(Circle().fill(Color.blue.gradient))
-                        .shadow(radius: 4, y: 2)
-                }
-                .padding(.trailing, 20)
-            }
-            .padding(.bottom, 20)
-        }
-    }
-}
-
-// Sous-vue pour les boutons de filtre
 private struct FilterButton: View {
     let title: String
     let status: ProjectStatus?
@@ -169,13 +258,11 @@ private struct FilterButton: View {
         } label: {
             Text(title)
                 .font(.subheadline)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(selectedStatus == status ? Color.blue : Color.gray.opacity(0.1))
-                )
-                .foregroundColor(selectedStatus == status ? .white : .primary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(status == selectedStatus ? Color.blue : Color.gray.opacity(0.1))
+                .foregroundColor(status == selectedStatus ? .white : .primary)
+                .cornerRadius(8)
         }
     }
 }
@@ -184,7 +271,10 @@ private struct FilterButton: View {
     NavigationView {
         ProjectsListView(
             projectManager: ProjectManager(activityLogService: ActivityLogService()),
-            contactsManager: ContactsManager()
+            contactsManager: ContactsManager(),
+            collaborationService: CollaborationService(),
+            helpService: HelpService(),
+            alertService: AlertService()
         )
     }
 }

@@ -1,0 +1,86 @@
+// General
+"app.name" = "IndyCRM";
+"app.welcome" = "Bienvenido a IndyCRM";
+"app.loading" = "Cargando...";
+
+// Navigation
+"nav.dashboard" = "Panel de control";
+"nav.contacts" = "Contactos";
+"nav.projects" = "Proyectos";
+"nav.invoices" = "Facturas";
+"nav.settings" = "Ajustes";
+
+// Contacts
+"contacts.title" = "Contactos";
+"contacts.new" = "Nuevo Contacto";
+"contacts.edit" = "Editar Contacto";
+"contacts.delete" = "Eliminar Contacto";
+"contacts.search" = "Buscar Contactos";
+"contacts.empty" = "No se encontraron contactos";
+
+// Projects
+"projects.title" = "Proyectos";
+"projects.new" = "Nuevo Proyecto";
+"projects.edit" = "Editar Proyecto";
+"projects.delete" = "Eliminar Proyecto";
+"projects.search" = "Buscar Proyectos";
+"projects.empty" = "No se encontraron proyectos";
+
+// Invoices
+"invoices.title" = "Facturas";
+"invoices.new" = "Nueva Factura";
+"invoices.edit" = "Editar Factura";
+"invoices.delete" = "Eliminar Factura";
+"invoices.search" = "Buscar Facturas";
+"invoices.empty" = "No se encontraron facturas";
+
+// Settings
+"settings.title" = "Ajustes";
+"settings.language" = "Idioma";
+"settings.backup" = "Copia de seguridad";
+"settings.restore" = "Restaurar";
+"settings.theme" = "Tema";
+"Sécurité et Conformité" = "Seguridad y Conformidad";
+"Tâches prioritaires" = "Tareas prioritarias";
+"Politique de confidentialité" = "Política de privacidad";
+
+// Actions
+"action.save" = "Guardar";
+"action.cancel" = "Cancelar";
+"action.delete" = "Eliminar";
+"action.edit" = "Editar";
+"action.add" = "Añadir";
+"action.confirm" = "Confirmar";
+
+// Messages
+"message.success" = "Éxito";
+"message.error" = "Error";
+"message.confirm" = "¿Estás seguro?";
+"message.delete_confirm" = "Esta acción no se puede deshacer.";
+
+// Backup
+"backup.create" = "Crear copia de seguridad";
+"backup.restore" = "Restaurar copia de seguridad";
+"backup.success" = "Copia de seguridad creada con éxito";
+"backup.error" = "Error al crear la copia de seguridad";
+"backup.restore_success" = "Copia de seguridad restaurada con éxito";
+"backup.restore_error" = "Error al restaurar la copia de seguridad";
+
+// Theme
+"settings.theme.title" = "Tema";
+"settings.theme.appearance" = "Apariencia";
+"settings.theme.accent_color" = "Color de acento";
+"settings.theme.system" = "Sistema";
+"settings.theme.light" = "Claro";
+"settings.theme.dark" = "Oscuro";
+"settings.theme.reset" = "Restablecer ajustes";
+"settings.theme.restart_needed" = "Puede ser necesario reiniciar la aplicación para aplicar todos los cambios.";
+"settings.theme.color.blue" = "Azul";
+"settings.theme.color.indigo" = "Índigo";
+"settings.theme.color.purple" = "Púrpura";
+"settings.theme.color.pink" = "Rosa";
+"settings.theme.color.red" = "Rojo";
+"settings.theme.color.orange" = "Naranja";
+"settings.theme.color.yellow" = "Amarillo";
+"settings.theme.color.green" = "Verde";
+"settings.theme.color.teal" = "Verde azulado"; 

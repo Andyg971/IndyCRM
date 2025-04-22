@@ -22,14 +22,19 @@ struct IndyCrmApp: App {
     
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environmentObject(authService)
-                .environmentObject(contactsManager)
-                .environmentObject(projectManager)
-                .environmentObject(invoiceManager)
-                .environmentObject(alertService)
-                .environmentObject(helpService)
-                .environmentObject(messagingService)
+            if authService.isAuthenticated {
+                ContentView()
+                    .environmentObject(authService)
+                    .environmentObject(contactsManager)
+                    .environmentObject(projectManager)
+                    .environmentObject(invoiceManager)
+                    .environmentObject(alertService)
+                    .environmentObject(helpService)
+                    .environmentObject(messagingService)
+            } else {
+                WelcomeView(authService: authService)
+                    .environmentObject(helpService)
+            }
         }
     }
 }

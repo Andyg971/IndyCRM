@@ -30,7 +30,6 @@ struct ProjectRowView: View {
                     progress: project.progress,
                     isPaused: project.status == .onHold
                 )
-                .frame(height: 16)
             }
             
             // Dates et tâches

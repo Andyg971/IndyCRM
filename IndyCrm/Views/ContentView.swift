@@ -1,64 +1,67 @@
 import SwiftUI
+import Foundation
 
 struct ContentView: View {
     @StateObject private var contactsManager = ContactsManager()
     @StateObject private var projectManager = ProjectManager(activityLogService: ActivityLogService())
     @StateObject private var invoiceManager = InvoiceManager()
-    @StateObject private var alertService = AlertService()
     @StateObject private var helpService = HelpService()
-    @EnvironmentObject var authService: AuthenticationService
+    @StateObject private var alertService = AlertService()
+    @StateObject private var collaborationService = CollaborationService()
+    @StateObject private var languageService = LanguageService.shared
+    @EnvironmentObject private var authService: AuthenticationService
+    
+    @AppStorage("colorSchemePreference") private var colorSchemePreference: Int = 0
+    @AppStorage("accentColorPreference") private var accentColorPreference: Int = 0
+    
+    var accentColor: Color {
+        switch accentColorPreference {
+        case 1: return .indigo
+        case 2: return .purple
+        case 3: return .pink
+        case 4: return .red
+        case 5: return .orange
+        case 6: return .yellow
+        case 7: return .green
+        case 8: return .teal
+        default: return .blue
+        }
+    }
     
     init() {
-        let alertService = AlertService()
-        _alertService = StateObject(wrappedValue: alertService)
-        _projectManager = StateObject(wrappedValue: ProjectManager(alertService: alertService))
-        
-        Task {
-            await alertService.setup()
-            await alertService.setup()
+        // Observer pour le changement de langue
+        NotificationCenter.default.addObserver(forName: Notification.Name("LanguageChanged"), object: nil, queue: .main) { _ in
+            // Invalider tous les caches pour forcer le rechargement des données avec les bonnes traductions
+            CacheService.shared.invalidateAllCaches()
+            print("🌐 Notification de changement de langue reçue, cache vidé")
         }
     }
-    
-    enum Tab {
-        case contacts, invoices, projects, dashboard
-    }
-    
-    @State private var selectedTab: Tab = .contacts
-    @State private var showingAlerts = false
     
     var body: some View {
-        Group {
-            if !authService.isAuthenticated {
-                WelcomeView(authService: authService)
-            } else {
-                mainView
-            }
-        }
-    }
-    
-    private var mainView: some View {
-        TabView(selection: $selectedTab) {
+        TabView {
             NavigationView {
-                ContactsListView(
-                    contactsManager: contactsManager,
-                    projectManager: projectManager
-                )
+                ContactsListView()
             }
             .tabItem {
-                Label("Contacts", systemImage: "person.2.fill")
+                Label("nav.contacts".localized, systemImage: "person.2.fill")
             }
-            .tag(Tab.contacts)
+            .environmentObject(contactsManager)
+            .environmentObject(projectManager)
+            .environmentObject(helpService)
+            .environmentObject(alertService)
             
             NavigationView {
                 ProjectsListView(
                     projectManager: projectManager,
-                    contactsManager: contactsManager
+                    contactsManager: contactsManager,
+                    collaborationService: collaborationService,
+                    helpService: helpService,
+                    alertService: alertService
                 )
             }
             .tabItem {
-                Label("Projets", systemImage: "folder.fill")
+                Label("nav.projects".localized, systemImage: "folder.fill")
             }
-            .tag(Tab.projects)
             
             NavigationView {
                 InvoicesListView(
@@ -67,9 +70,10 @@ struct ContentView: View {
                 )
             }
             .tabItem {
-                Label("Factures", systemImage: "doc.text.fill")
+                Label("nav.invoices".localized, systemImage: "doc.text.fill")
             }
-            .tag(Tab.invoices)
+            .environmentObject(helpService)
+            .environmentObject(alertService)
             
             NavigationView {
                 DashboardView(
@@ -79,67 +83,23 @@ struct ContentView: View {
                 )
             }
             .tabItem {
-                Label("Tableau de bord", systemImage: "chart.bar.fill")
+                Label("nav.dashboard".localized, systemImage: "chart.bar")
             }
-            .tag(Tab.dashboard)
-        }
-        .environmentObject(helpService)
-        .tint(.indigo)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                VStack(spacing: 8) {
-                    Button {
-                        // Action pour le bouton +
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(.indigo.gradient)
-                    }
-                    
-                    Menu {
-                        Button {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                helpService.showingHelp = true
-                            }
-                        } label: {
-                            Label("Aide", systemImage: "questionmark.circle.fill")
-                        }
-                        
-                        Button {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                showingAlerts = true
-                            }
-                        } label: {
-                            HStack {
-                                Label("Notifications", systemImage: "bell.fill")
-                                if !alertService.currentAlerts.isEmpty {
-                                    Circle()
-                                        .fill(.red)
-                                        .frame(width: 6, height: 6)
-                                }
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "questionmark.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(.indigo.gradient)
-                    }
-                }
+            
+            NavigationView {
+                SettingsView()
             }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: { authService.signOut() }) {
-                    Image(systemName: "rectangle.portrait.and.arrow.right")
-                }
+            .tabItem {
+                Label("nav.settings".localized, systemImage: "gear")
             }
+            .environmentObject(helpService)
+            .environmentObject(alertService)
+            .environmentObject(projectManager)
         }
-        .sheet(isPresented: $showingAlerts) {
-            AlertsView(alertService: alertService)
-                .presentationBackground(.ultraThinMaterial)
-        }
-        .sheet(isPresented: $helpService.showingHelp) {
-            HelpView(helpService: helpService)
-                .presentationBackground(.ultraThinMaterial)
-        }
+        .tint(accentColor)
+        .preferredColorScheme(from: colorSchemePreference)
+        .environmentObject(languageService)
+        .id(languageService.refreshID)
     }
 }
 
@@ -147,14 +107,21 @@ extension View {
     func navigationBarBackground() -> some View {
         self.toolbarBackground(.ultraThinMaterial, for: .navigationBar)
     }
+    
+    @ViewBuilder
+    func preferredColorScheme(from preference: Int) -> some View {
+        switch preference {
+        case 1:
+            self.preferredColorScheme(.light)
+        case 2:
+            self.preferredColorScheme(.dark)
+        default:
+            self.preferredColorScheme(nil) // Utilise la préférence système
+        }
+    }
 }
 
 #Preview {
     ContentView()
         .environmentObject(AuthenticationService())
-        .environmentObject(ContactsManager())
-        .environmentObject(ProjectManager(activityLogService: ActivityLogService()))
-        .environmentObject(InvoiceManager())
-        .environmentObject(MessagingService())
-        .preferredColorScheme(.light)
 } 

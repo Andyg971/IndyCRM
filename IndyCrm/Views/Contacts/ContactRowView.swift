@@ -9,7 +9,7 @@ struct ContactRowView: View {
                 Text(contact.fullName)
                     .font(.headline)
                 Spacer()
-                Text(contact.type.rawValue)
+                Text(contact.type.localizedName)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

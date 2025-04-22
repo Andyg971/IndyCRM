@@ -1,0 +1,86 @@
+// General
+"app.name" = "IndyCRM";
+"app.welcome" = "Benvenuto in IndyCRM";
+"app.loading" = "Caricamento...";
+
+// Navigation
+"nav.dashboard" = "Dashboard";
+"nav.contacts" = "Contatti";
+"nav.projects" = "Progetti";
+"nav.invoices" = "Fatture";
+"nav.settings" = "Impostazioni";
+
+// Contacts
+"contacts.title" = "Contatti";
+"contacts.new" = "Nuovo Contatto";
+"contacts.edit" = "Modifica Contatto";
+"contacts.delete" = "Elimina Contatto";
+"contacts.search" = "Cerca Contatti";
+"contacts.empty" = "Nessun contatto trovato";
+
+// Projects
+"projects.title" = "Progetti";
+"projects.new" = "Nuovo Progetto";
+"projects.edit" = "Modifica Progetto";
+"projects.delete" = "Elimina Progetto";
+"projects.search" = "Cerca Progetti";
+"projects.empty" = "Nessun progetto trovato";
+
+// Invoices
+"invoices.title" = "Fatture";
+"invoices.new" = "Nuova Fattura";
+"invoices.edit" = "Modifica Fattura";
+"invoices.delete" = "Elimina Fattura";
+"invoices.search" = "Cerca Fatture";
+"invoices.empty" = "Nessuna fattura trovata";
+
+// Settings
+"settings.title" = "Impostazioni";
+"settings.language" = "Lingua";
+"settings.backup" = "Backup";
+"settings.restore" = "Ripristino";
+"settings.theme" = "Tema";
+"Sécurité et Conformité" = "Sicurezza e Conformità";
+"Tâches prioritaires" = "Attività prioritarie";
+"Politique de confidentialité" = "Politica sulla privacy";
+
+// Actions
+"action.save" = "Salva";
+"action.cancel" = "Annulla";
+"action.delete" = "Elimina";
+"action.edit" = "Modifica";
+"action.add" = "Aggiungi";
+"action.confirm" = "Conferma";
+
+// Messages
+"message.success" = "Successo";
+"message.error" = "Errore";
+"message.confirm" = "Sei sicuro?";
+"message.delete_confirm" = "Questa azione non può essere annullata.";
+
+// Backup
+"backup.create" = "Crea backup";
+"backup.restore" = "Ripristina backup";
+"backup.success" = "Backup creato con successo";
+"backup.error" = "Errore durante la creazione del backup";
+"backup.restore_success" = "Backup ripristinato con successo";
+"backup.restore_error" = "Errore durante il ripristino del backup";
+
+// Theme
+"settings.theme.title" = "Tema";
+"settings.theme.appearance" = "Aspetto";
+"settings.theme.accent_color" = "Colore di accento";
+"settings.theme.system" = "Sistema";
+"settings.theme.light" = "Chiaro";
+"settings.theme.dark" = "Scuro";
+"settings.theme.reset" = "Ripristina impostazioni";
+"settings.theme.restart_needed" = "Potrebbe essere necessario riavviare l'applicazione per applicare tutte le modifiche.";
+"settings.theme.color.blue" = "Blu";
+"settings.theme.color.indigo" = "Indaco";
+"settings.theme.color.purple" = "Viola";
+"settings.theme.color.pink" = "Rosa";
+"settings.theme.color.red" = "Rosso";
+"settings.theme.color.orange" = "Arancione";
+"settings.theme.color.yellow" = "Giallo";
+"settings.theme.color.green" = "Verde";
+"settings.theme.color.teal" = "Verde acqua"; 

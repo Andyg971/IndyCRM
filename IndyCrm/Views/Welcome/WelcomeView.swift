@@ -7,163 +7,50 @@ struct WelcomeView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var isPasswordVisible = false
+    @State private var animateLogo = false
+    @State private var showForm = false
     
     var body: some View {
         ZStack {
-            // Arrière-plan avec dégradé
-            LinearGradient(
-                colors: [
-                    Color.indigo.opacity(0.1),
-                    Color.white,
-                    Color.indigo.opacity(0.15)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            // Fond blanc simple
+            Color.white.ignoresSafeArea()
             
             // Contenu principal
             ScrollView {
-                VStack(spacing: 25) {
+                VStack(spacing: 30) {
+                    Spacer(minLength: 40)
+                    
                     // Logo et titre
-                    VStack(spacing: 25) {
-                        // Logo animé
-                        Image(systemName: "building.2.fill")
-                            .font(.system(size: 90))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.indigo, .blue],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .shadow(color: .indigo.opacity(0.3), radius: 10, y: 5)
-                            .rotation3DEffect(.degrees(authService.isLoading ? 360 : 0),
-                                           axis: (x: 0, y: 1, z: 0))
-                            .animation(.easeInOut(duration: 1).repeatForever(autoreverses: false),
-                                     value: authService.isLoading)
-                        
-                        Text("IndyCRM")
-                            .font(.system(size: 42, weight: .bold, design: .rounded))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.indigo, .blue],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                    }
+                    LogoView(animate: $animateLogo, isLoading: authService.isLoading)
+                        .padding(.bottom, 20)
                     
                     // Sous-titre
-                    Text("Gérez vos contacts et projets\nen toute simplicité")
-                        .font(.title2.weight(.medium))
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(.secondary)
+                    SubtitleView()
+                        .opacity(showForm ? 1 : 0)
+                        .offset(y: showForm ? 0 : 20)
                     
                     // Formulaire de connexion
-                    VStack(spacing: 20) {
-                        // Email
-                        HStack {
-                            Image(systemName: "envelope.fill")
-                                .foregroundColor(.indigo)
-                            TextField("Email", text: $email)
-                                .textContentType(.emailAddress)
-                                .keyboardType(.emailAddress)
-                                .autocapitalization(.none)
-                        }
-                        .padding()
-                        .background(Color.white)
-                        .cornerRadius(15)
-                        .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
-                        
-                        // Mot de passe
-                        HStack {
-                            Image(systemName: "lock.fill")
-                                .foregroundColor(.indigo)
-                            if isPasswordVisible {
-                                TextField("Mot de passe", text: $password)
-                            } else {
-                                SecureField("Mot de passe", text: $password)
-                            }
-                            Button {
-                                isPasswordVisible.toggle()
-                            } label: {
-                                Image(systemName: isPasswordVisible ? "eye.slash.fill" : "eye.fill")
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                        .padding()
-                        .background(Color.white)
-                        .cornerRadius(15)
-                        .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
-                        
-                        // Bouton de connexion
-                        Button {
+                    LoginFormView(
+                        email: $email,
+                        password: $password,
+                        isPasswordVisible: $isPasswordVisible,
+                        onLogin: {
                             Task {
                                 await authService.signInWithEmail(email: email, password: password)
                             }
-                        } label: {
-                            HStack {
-                                Text("Se connecter")
-                                    .font(.headline)
-                                Image(systemName: "arrow.right")
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(
-                                LinearGradient(
-                                    colors: [.indigo, .blue],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .foregroundColor(.white)
-                            .cornerRadius(15)
-                            .shadow(color: .indigo.opacity(0.3), radius: 5, y: 2)
                         }
-                        
-                        // Séparateur
-                        HStack {
-                            Rectangle()
-                                .frame(height: 1)
-                                .foregroundColor(.gray.opacity(0.3))
-                            Text("ou")
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
-                            Rectangle()
-                                .frame(height: 1)
-                                .foregroundColor(.gray.opacity(0.3))
-                        }
-                    }
+                    )
+                    .environmentObject(authService)
                     .padding(.horizontal)
-                    
-                    // Bouton sans inscription
-                    Button {
-                        authService.signInAnonymously()
-                    } label: {
-                        Text("Continuer sans inscription")
-                            .font(.headline)
-                            .padding()
-                            .foregroundStyle(.indigo)
-                            .background(
-                                Capsule()
-                                    .stroke(Color.indigo, lineWidth: 2)
-                            )
-                    }
+                    .opacity(showForm ? 1 : 0)
+                    .offset(y: showForm ? 0 : 40)
                 }
-                .padding(.top, 60)
                 .padding(.horizontal)
             }
             
             // Overlay de chargement
             if authService.isLoading {
-                Color.black.opacity(0.3)
-                    .ignoresSafeArea()
-                    .overlay(
-                        ProgressView()
-                            .scaleEffect(1.5)
-                            .tint(.white)
-                    )
+                LoadingOverlayView()
             }
         }
         .alert("Erreur de connexion", isPresented: .init(
@@ -176,6 +63,240 @@ struct WelcomeView: View {
                 Text(error)
             }
         }
+        .onAppear {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                animateLogo = true
+            }
+            
+            withAnimation(.easeOut.delay(0.3)) {
+                showForm = true
+            }
+        }
+        .accessibilityIdentifier("welcomeView")
+    }
+}
+
+// Composants modulaires simplifiés
+struct BackgroundView: View {
+    var body: some View {
+        Color.white.ignoresSafeArea()
+    }
+}
+
+struct LogoView: View {
+    @Binding var animate: Bool
+    var isLoading: Bool
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            // Logo simplifié
+            Image("IndyLogo")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 90, height: 90)
+                .scaleEffect(animate ? 1 : 0.5)
+            
+            // Titre simplifié
+            Text("IndyCRM")
+                .font(.system(size: 36, weight: .bold, design: .rounded))
+                .foregroundColor(.black)
+                .opacity(animate ? 1 : 0)
+                .accessibilityAddTraits(.isHeader)
+        }
+    }
+}
+
+struct SubtitleView: View {
+    var body: some View {
+        Text("La gestion de votre entreprise\nn'a jamais été aussi simple")
+            .font(.title3.weight(.regular))
+            .multilineTextAlignment(.center)
+            .foregroundColor(.gray)
+            .padding(.horizontal)
+            .accessibilityIdentifier("subtitle")
+    }
+}
+
+struct LoginFormView: View {
+    @Binding var email: String
+    @Binding var password: String
+    @Binding var isPasswordVisible: Bool
+    var onLogin: () -> Void
+    @State private var isEmailFocused = false
+    @State private var isPasswordFocused = false
+    @EnvironmentObject var authService: AuthenticationService
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            // Champs de connexion
+            VStack(spacing: 16) {
+                // Email
+                SimpleTextFieldWithIcon(
+                    iconName: "envelope",
+                    placeholder: "Email",
+                    text: $email,
+                    isFocused: $isEmailFocused
+                )
+                .textContentType(.emailAddress)
+                .keyboardType(.emailAddress)
+                .autocapitalization(.none)
+                
+                // Mot de passe
+                SimplePasswordFieldWithIcon(
+                    password: $password,
+                    isVisible: $isPasswordVisible,
+                    isFocused: $isPasswordFocused
+                )
+            }
+            
+            // Bouton de connexion
+            Button(action: onLogin) {
+                Text("Se connecter")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+            }
+            .padding(.top, 8)
+            
+            // Séparateur
+            HStack {
+                VStack { Divider() }
+                Text("ou")
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+                    .padding(.horizontal, 8)
+                VStack { Divider() }
+            }
+            .padding(.vertical, 8)
+            
+            // Bouton Apple
+            SignInWithAppleButton(
+                .signIn,
+                onRequest: { request in
+                    request.requestedScopes = [.fullName, .email]
+                    // Permettre au service AppleAuthenticationService de configurer le nonce
+                    authService.prepareAppleSignIn(request: request)
+                },
+                onCompletion: { result in
+                    // Traiter directement le résultat d'authentification
+                    switch result {
+                    case .success(let authorization):
+                        // Passer les informations d'identification au service
+                        if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
+                            authService.processAppleSignIn(credential: appleIDCredential)
+                        }
+                    case .failure(let error):
+                        // Afficher l'erreur à l'utilisateur
+                        authService.errorMessage = error.localizedDescription
+                    }
+                }
+            )
+            .frame(height: 50)
+            .signInWithAppleButtonStyle(.black)
+            .cornerRadius(8)
+            .accessibilityIdentifier("appleSignInButton")
+        }
+        .accessibilityIdentifier("loginForm")
+    }
+}
+
+struct SimpleTextFieldWithIcon: View {
+    var iconName: String
+    var placeholder: String
+    @Binding var text: String
+    @Binding var isFocused: Bool
+    
+    var body: some View {
+        HStack {
+            Image(systemName: iconName)
+                .foregroundColor(.gray)
+                .frame(width: 24)
+                .padding(.leading, 8)
+            
+            TextField(placeholder, text: $text, onEditingChanged: { editing in
+                isFocused = editing
+            })
+            .padding()
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(isFocused ? Color.blue : Color.gray.opacity(0.3), lineWidth: 1)
+        )
+    }
+}
+
+struct SimplePasswordFieldWithIcon: View {
+    @Binding var password: String
+    @Binding var isVisible: Bool
+    @Binding var isFocused: Bool
+    
+    var body: some View {
+        HStack {
+            Image(systemName: "lock")
+                .foregroundColor(.gray)
+                .frame(width: 24)
+                .padding(.leading, 8)
+            
+            if isVisible {
+                TextField("Mot de passe", text: $password, onEditingChanged: { editing in
+                    isFocused = editing
+                })
+                .padding()
+            } else {
+                SecureField("Mot de passe", text: $password)
+                    .padding()
+                    .onChange(of: password) { oldValue, newValue in
+                        isFocused = true
+                    }
+            }
+            
+            Button {
+                isVisible.toggle()
+            } label: {
+                Image(systemName: isVisible ? "eye.slash" : "eye")
+                    .foregroundColor(.gray)
+                    .padding(.trailing, 8)
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(isFocused ? Color.blue : Color.gray.opacity(0.3), lineWidth: 1)
+        )
+    }
+}
+
+struct LoadingOverlayView: View {
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 16) {
+                ProgressView()
+                    .scaleEffect(1.2)
+                
+                Text("Connexion en cours...")
+                    .font(.headline)
+                    .foregroundColor(.white)
+            }
+            .padding(20)
+            .background(Color.white.opacity(0.9))
+            .cornerRadius(8)
+        }
+        .transition(.opacity)
+        .accessibilityIdentifier("loadingOverlay")
+    }
+}
+
+// Style de bouton simple
+struct ScaleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.9 : 1)
     }
 }
 
@@ -183,5 +304,7 @@ struct WelcomeView: View {
 struct WelcomeView_Previews: PreviewProvider {
     static var previews: some View {
         WelcomeView(authService: AuthenticationService())
+            .environmentObject(HelpService())
+            .previewDisplayName("Welcome Screen")
     }
 } 

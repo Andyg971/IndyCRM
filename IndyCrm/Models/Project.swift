@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-public struct Project: Identifiable, Codable {
+public struct Project: Identifiable, Codable, Hashable {
     public let id: UUID
     public var name: String
     public var clientId: UUID
@@ -11,6 +11,8 @@ public struct Project: Identifiable, Codable {
     public var tasks: [ProjectTask]
     public var notes: String
     public var milestones: [Milestone]
+    public var isFavorite: Bool = false
+    public var updatedAt: Date?
     
     // Calculs dérivés
     public var progress: Double {
@@ -44,7 +46,7 @@ public struct Project: Identifiable, Codable {
     }
 }
 
-public struct Milestone: Identifiable, Codable {
+public struct Milestone: Identifiable, Codable, Hashable {
     public let id: UUID
     public let title: String
     public let date: Date

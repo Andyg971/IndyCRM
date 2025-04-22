@@ -153,7 +153,7 @@ struct TaskBoardView: View {
         }
     }
     
-    // Tâches filtrées
+    // Utiliser directement project.tasks pour filtrer
     private var filteredTasks: [TaskStatus: [ProjectTask]] {
         let filtered = project.tasks.filter { task in
             if !searchText.isEmpty {
@@ -179,16 +179,12 @@ struct TaskBoardView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // En-tête avec titre et boutons
             headerView
             
-            // Barre de recherche et filtres
             searchAndFilterBar
             
-            // Colonnes de tâches
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 16) {
-                    // Colonne "À faire"
                     taskColumn(
                         title: "À faire",
                         systemImage: "circle",
@@ -196,7 +192,6 @@ struct TaskBoardView: View {
                         tasks: filteredTasks[.todo] ?? []
                     )
                     
-                    // Colonne "En cours"
                     taskColumn(
                         title: "En cours",
                         systemImage: "arrow.right.circle",
@@ -204,7 +199,6 @@ struct TaskBoardView: View {
                         tasks: filteredTasks[.inProgress] ?? []
                     )
                     
-                    // Colonne "En revue"
                     taskColumn(
                         title: "En revue",
                         systemImage: "eye.circle",
@@ -212,7 +206,6 @@ struct TaskBoardView: View {
                         tasks: filteredTasks[.review] ?? []
                     )
                     
-                    // Colonne "Terminé"
                     taskColumn(
                         title: "Terminé",
                         systemImage: "checkmark.circle",
@@ -222,7 +215,7 @@ struct TaskBoardView: View {
                 }
                 .padding()
             }
-            .allowsHitTesting(true) // S'assurer que le scroll fonctionne
+            .allowsHitTesting(true)
             .background(secondaryBackgroundColor.opacity(0.5))
         }
         .sheet(isPresented: $showingNewTaskSheet) {
@@ -230,9 +223,11 @@ struct TaskBoardView: View {
                 TaskFormView(
                     contactsManager: contactsManager,
                     onSave: { task in
-                        var updatedProject = project
-                        updatedProject.tasks.append(task)
-                        projectManager.updateProject(updatedProject)
+                        guard var projectToUpdate = projectManager.projects.first(where: { $0.id == project.id }) else { return }
+                        projectToUpdate.tasks.append(task)
+                        Task {
+                            await projectManager.updateProject(projectToUpdate)
+                        }
                         
                         alertService.createAlert(
                             type: .success,
@@ -244,25 +239,22 @@ struct TaskBoardView: View {
                 )
             }
         }
-        .onTapGesture { } // Bloque les taps généraux
+        .onTapGesture { }
         .background(
-            // Utiliser la nouvelle API NavigationLink recommandée
             Group {
                 if #available(iOS 16.0, *) {
-                    // Ajouter un gestionnaire qui intercepte les taps pour éviter la navigation
                     EmptyView()
                         .simultaneousGesture(TapGesture().onEnded { _ in })
                 } else {
-                    // Fallback pour iOS 15 et moins avec un NavigationLink vide et désactivé
                     NavigationLink(destination: EmptyView(), isActive: .constant(false)) {
                         EmptyView()
                     }
-                    .disabled(true) // Désactiver complètement le NavigationLink
-                    .opacity(0) // Rendre invisible
+                    .disabled(true)
+                    .opacity(0)
                 }
             }
         )
-        .environment(\.isEnabled, true) // S'assurer que les interactions de l'utilisateur sont activées
+        .environment(\.isEnabled, true)
     }
     
     // MARK: - Composants d'interface
@@ -280,7 +272,6 @@ struct TaskBoardView: View {
             
             Spacer()
             
-            // Bouton de rafraîchissement
             Button(action: refreshTasks) {
                 Image(systemName: "arrow.clockwise")
                     .font(.headline)
@@ -289,12 +280,12 @@ struct TaskBoardView: View {
             .buttonStyle(.bordered)
             .tint(.secondary)
             
-            // Bouton d'ajout
             Button(action: { showingNewTaskSheet = true }) {
                 Label("Nouvelle tâche", systemImage: "plus.circle.fill")
                     .font(.headline)
             }
             .buttonStyle(.borderedProminent)
+            .tint(.purple)
         }
         .padding()
         .background(backgroundColor)
@@ -302,7 +293,6 @@ struct TaskBoardView: View {
     
     private var searchAndFilterBar: some View {
         VStack(spacing: 8) {
-            // Barre de recherche
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
@@ -322,7 +312,6 @@ struct TaskBoardView: View {
             .cornerRadius(8)
             .padding(.horizontal)
             
-            // Filtres
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(TaskFilter.allCases) { filter in
@@ -356,7 +345,6 @@ struct TaskBoardView: View {
     
     private func taskColumn(title: String, systemImage: String, color: Color, tasks: [ProjectTask]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            // En-tête de colonne
             HStack {
                 Label {
                     Text(title)
@@ -379,19 +367,17 @@ struct TaskBoardView: View {
                     .clipShape(Capsule())
             }
             
-            // Liste des tâches
             if tasks.isEmpty {
                 emptyColumnView(color: color)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 12) {
                         ForEach(tasks) { task in
-                            // Supprimer toute navigation associée à la carte
                             taskCardView(task: task)
-                                .id(task.id)  // Force à recréer la vue si la tâche change
-                                .buttonStyle(PlainButtonStyle()) // Éviter le comportement des boutons
-                                .onTapGesture {} // Bloquer les taps sur la carte entière
-                                .simultaneousGesture(TapGesture().onEnded { _ in }) // Double sécurité
+                                .id(task.id)
+                                .buttonStyle(PlainButtonStyle())
+                                .onTapGesture {}
+                                .simultaneousGesture(TapGesture().onEnded { _ in })
                                 .contentShape(Rectangle())
                                 .onDrag {
                                     draggedTask = task
@@ -429,16 +415,13 @@ struct TaskBoardView: View {
     
     private func taskCardView(task: ProjectTask) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            // En-tête avec le titre
             HStack {
                 Text(task.title)
                     .font(.headline)
                     .lineLimit(1)
                 Spacer()
                 
-                // Boutons
                 HStack(spacing: 12) {
-                    // Bouton de suivi du temps (implémentation directe sans Button)
                     Image(systemName: timeTracker.isTrackingTask(task.id) ? "stop.circle.fill" : "play.circle.fill")
                         .foregroundColor(timeTracker.isTrackingTask(task.id) ? .red : .green)
                         .font(.title3)
@@ -472,7 +455,6 @@ struct TaskBoardView: View {
                         }
                         .preventNavigation()
                     
-                    // Bouton de complétion (implémentation directe)
                     ZStack {
                         Circle()
                             .fill(task.isCompleted ? Color.green : Color.clear)
@@ -497,59 +479,56 @@ struct TaskBoardView: View {
                 }
             }
             
-            // Contenu de la carte
-            VStack(alignment: .leading, spacing: 8) {
-                // Description
-                if !task.description.isEmpty {
-                    Text(task.description)
+            if !task.description.isEmpty {
+                Text(task.description)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+            }
+            
+            HStack(spacing: 12) {
+                if let assignedContact = task.assignedTo.flatMap({ id in
+                    contactsManager.contacts.first { $0.id == id }
+                }) {
+                    Label(assignedContact.fullName, systemImage: "person.circle.fill")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                        .lineLimit(2)
                 }
                 
-                // Métadonnées
-                HStack(spacing: 12) {
-                    if let assignedContact = task.assignedTo.flatMap({ id in
-                        contactsManager.contacts.first { $0.id == id }
-                    }) {
-                        Label(assignedContact.fullName, systemImage: "person.circle.fill")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                if let dueDate = task.dueDate {
+                    Label(dueDate.formatted(date: .abbreviated, time: .omitted),
+                          systemImage: "calendar")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            if let estimatedHours = task.estimatedHours {
+                VStack(spacing: 4) {
+                    ModernProgressBar(
+                        progress: task.progress,
+                        isPaused: false
+                    )
+                    .frame(height: 8)
                     
-                    if let dueDate = task.dueDate {
-                        Label(dueDate.formatted(date: .abbreviated, time: .omitted),
-                              systemImage: "calendar")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                // Progression avec temps de travail en cours
-                if let estimatedHours = task.estimatedHours {
-                    VStack(spacing: 4) {
-                        ProgressView(value: task.progress)
-                            .tint(self.progressColor(for: task.progress))
-                        
+                    HStack {
                         HStack {
-                            HStack {
-                                Image(systemName: "clock")
-                                if timeTracker.isTrackingTask(task.id),
-                                   let elapsedTime = timeTracker.getElapsedTime(for: task.id) {
-                                    TimeDisplay(task: task, elapsedTime: elapsedTime, estimatedHours: estimatedHours)
-                                } else {
-                                    Text("\(Int(task.workedHours))h / \(Int(estimatedHours))h")
-                                        .foregroundColor(.secondary)
-                                }
+                            Image(systemName: "clock")
+                            if timeTracker.isTrackingTask(task.id),
+                               let elapsedTime = timeTracker.getElapsedTime(for: task.id) {
+                                TimeDisplay(task: task, elapsedTime: elapsedTime, estimatedHours: estimatedHours)
+                            } else {
+                                Text("\(Int(task.workedHours))h / \(Int(estimatedHours))h")
+                                    .foregroundColor(.secondary)
                             }
-                            .font(.caption)
-                            
-                            Spacer()
-                            
-                            Text("\(Int(task.progress * 100))%")
-                                .font(.caption.bold())
-                                .foregroundColor(self.progressColor(for: task.progress))
                         }
+                        .font(.caption)
+                        
+                        Spacer()
+                        
+                        Text("\(Int(task.progress * 100))%")
+                            .font(.caption.bold())
+                            .foregroundColor(progressColor(for: task.progress))
                     }
                 }
             }
@@ -564,16 +543,9 @@ struct TaskBoardView: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color.gray.opacity(0.2), lineWidth: 1)
         )
-        .preventNavigation() // Prévenir toute navigation
-        .onDrop(of: [UTType.text.identifier], delegate: TaskDropDelegate(
-            destinationStatus: task.status,
-            draggedTask: $draggedTask,
-            tasks: project.tasks,
-            onTaskMoved: updateTask
-        ))
+        .preventNavigation()
     }
     
-    // Fonction pour déterminer la couleur de progression
     private func progressColor(for value: Double) -> Color {
         switch value {
         case 0..<0.3: return .red
@@ -583,7 +555,6 @@ struct TaskBoardView: View {
         }
     }
     
-    // MARK: - Composants de la carte
     struct TimeTrackingButton: View {
         let task: ProjectTask
         @ObservedObject var timeTracker: TaskTimeTracker
@@ -656,7 +627,6 @@ struct TaskBoardView: View {
         
         var body: some View {
             VStack(alignment: .leading, spacing: 8) {
-                // Description
                 if !task.description.isEmpty {
                     Text(task.description)
                         .font(.caption)
@@ -664,7 +634,6 @@ struct TaskBoardView: View {
                         .lineLimit(2)
                 }
                 
-                // Métadonnées
                 HStack(spacing: 12) {
                     if let assignedContact = task.assignedTo.flatMap({ id in
                         contactsManager.contacts.first { $0.id == id }
@@ -682,11 +651,13 @@ struct TaskBoardView: View {
                     }
                 }
                 
-                // Progression avec temps de travail en cours
                 if let estimatedHours = task.estimatedHours {
                     VStack(spacing: 4) {
-                        ProgressView(value: task.progress)
-                            .tint(progressColor(for: task.progress))
+                        ModernProgressBar(
+                            progress: task.progress,
+                            isPaused: false
+                        )
+                        .frame(height: 8)
                         
                         HStack {
                             HStack {
@@ -697,11 +668,9 @@ struct TaskBoardView: View {
                                 } else {
                                     Text("\(Int(task.workedHours))h / \(Int(estimatedHours))h")
                                         .foregroundColor(.secondary)
-                                        .onTapGesture {} // Empêche toute interaction
                                 }
                             }
                             .font(.caption)
-                            .onTapGesture {} // Empêche toute interaction
                             
                             Spacer()
                             
@@ -710,10 +679,8 @@ struct TaskBoardView: View {
                                 .foregroundColor(progressColor(for: task.progress))
                         }
                     }
-                    .onTapGesture {} // Empêche toute interaction
                 }
             }
-            .onTapGesture {} // Empêche toute interaction
         }
         
         private func progressColor(for value: Double) -> Color {
@@ -750,15 +717,12 @@ struct TaskBoardView: View {
             isRefreshing = true
         }
         
-        // Simuler un rafraîchissement
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             isRefreshing = false
         }
     }
     
-    // Remplacer la fonction showTimeSheet pour empêcher toute redirection
     private func showTimeSheet(for task: ProjectTask) {
-        // Ne rien faire - cette fonction est délibérément vide pour empêcher la redirection
         print("Tentative de redirection bloquée")
     }
     
@@ -774,15 +738,40 @@ struct TaskBoardView: View {
     }
     
     private func updateTask(_ task: ProjectTask) {
-        var updatedProject = project
-        if let index = updatedProject.tasks.firstIndex(where: { $0.id == task.id }) {
-            updatedProject.tasks[index] = task
-            projectManager.updateProject(updatedProject)
+        guard let originalProject = projectManager.projects.first(where: { $0.id == project.id }), 
+              let taskIndex = originalProject.tasks.firstIndex(where: { $0.id == task.id }) else {
+            print("Error: Task to update not found in project manager for project ID \(project.id).")
+            return
+        }
+
+        var updatedProject = originalProject
+        updatedProject.tasks[taskIndex] = task
+
+        Task {
+            await projectManager.updateProject(updatedProject)
+            print("Tâche mise à jour dans le projet via le manager")
+        }
+    }
+    
+    private func deleteTask(_ task: ProjectTask) {
+        guard var projectToUpdate = projectManager.projects.first(where: { $0.id == project.id }) else { 
+            print("Error: Project not found in manager for deletion for project ID \(project.id).")
+            return 
+        }
+        projectToUpdate.tasks.removeAll { $0.id == task.id }
+        
+        Task {
+            await projectManager.updateProject(projectToUpdate)
+            alertService.createAlert(
+                type: .success,
+                title: "Tâche supprimée",
+                message: "La tâche \"\(task.title)\" a été supprimée.",
+                severity: .low
+             )
         }
     }
 }
 
-// MARK: - Délégué pour le glisser-déposer
 struct TaskDropDelegate: DropDelegate {
     let destinationStatus: TaskStatus
     @Binding var draggedTask: ProjectTask?
@@ -801,10 +790,8 @@ struct TaskDropDelegate: DropDelegate {
     }
 }
 
-// Une vraie solution complète pour éviter toute redirection
 extension View {
     func preventNavigation() -> some View {
-        // Cette modification empêche la propagation des événements de tap
         self.simultaneousGesture(TapGesture().onEnded { _ in })
     }
 }
@@ -832,13 +819,13 @@ struct TaskBoardView_Previews: PreviewProvider {
         let alertService = AlertService()
         let projectManager = ProjectManager()
         let contactsManager = ContactsManager()
-        let project = Project.example
+        let exampleProject = Project.example
         
         NavigationView {
             TaskBoardView(
                 projectManager: projectManager,
                 contactsManager: contactsManager,
-                project: project
+                project: exampleProject
             )
         }
         .environmentObject(alertService)

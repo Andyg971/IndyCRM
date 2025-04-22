@@ -126,10 +126,12 @@ struct InvoiceFormView: View {
             notes: notes
         )
         
-        if isEditing {
-            invoiceManager.updateInvoice(invoice)
-        } else {
-            invoiceManager.addInvoice(invoice)
+        Task {
+            if isEditing {
+                await invoiceManager.updateInvoice(invoice)
+            } else {
+                await invoiceManager.addInvoice(invoice)
+            }
         }
         
         // Programmer les notifications pour l'échéance

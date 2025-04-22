@@ -10,64 +10,95 @@ struct ExportColumn: Identifiable {
 }
 
 struct ContactsListView: View {
-    @ObservedObject var contactsManager: ContactsManager
-    @ObservedObject var projectManager: ProjectManager
-    @State private var showingAddContact = false
+    @EnvironmentObject var contactsManager: ContactsManager
+    @EnvironmentObject var projectManager: ProjectManager
     @State private var searchText = ""
     @State private var selectedType: ContactType?
-    @State private var showingExportOptions = false
+    @State private var showingNewContact = false
+    @StateObject private var exportService = ExportService()
+    @State private var showingShareSheet = false
+    @State private var exportURL: URL?
     
     var body: some View {
-        VStack(spacing: 0) {
-            FilterBarView(selectedType: $selectedType)
-            ContactListContent(
-                contacts: filteredContacts,
-                contactsManager: contactsManager
-            )
+        ZStack {
+            VStack(spacing: 0) {
+                FilterBarView(searchText: $searchText, selectedType: $selectedType)
+                
+                List {
+                    ForEach(filteredContacts) { contact in
+                        NavigationLink(destination: ContactDetailView(
+                            contact: contact,
+                            contactsManager: contactsManager,
+                            projectManager: projectManager
+                        )) {
+                            ContactRow(contact: contact)
+                        }
+                    }
+                    .onDelete(perform: deleteContacts)
+                }
+            }
+            
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button(action: { showingNewContact = true }) {
+                        Image(systemName: "plus.circle.fill")
+                            .resizable()
+                            .frame(width: 50, height: 50)
+                            .foregroundColor(.indigo)
+                            .background(Color.white)
+                            .clipShape(Circle())
+                            .shadow(radius: 4)
+                    }
+                    .padding()
+                }
+            }
         }
-        .searchable(text: $searchText, prompt: "Rechercher un contact")
         .navigationTitle("Contacts")
-        .toolbar { toolbarContent }
-        .sheet(isPresented: $showingAddContact) {
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button(action: exportToCSV) {
+                        Label("Exporter en CSV", systemImage: "doc.text")
+                    }
+                    
+                    Button(action: exportToVCard) {
+                        Label("Exporter en vCard", systemImage: "person.crop.rectangle")
+                    }
+                    
+                    Button(action: exportToExcel) {
+                        Label("Exporter en Excel", systemImage: "tablecells")
+                    }
+                    
+                    Button(action: { showingNewContact = true }) {
+                        Label("Ajouter un contact", systemImage: "plus")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+            }
+        }
+        .accentColor(.indigo)
+        .sheet(isPresented: $showingNewContact) {
             NavigationView {
                 ContactFormView(contactsManager: contactsManager, projectManager: projectManager)
-                    .navigationBarTitleDisplayMode(.inline)
             }
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showingExportOptions) {
-            ExportView(
-                projectManager: projectManager,
-                contactsManager: contactsManager,
-                invoiceManager: InvoiceManager()
-            )
-        }
-    }
-    
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .primaryAction) {
-            Menu {
-                Button {
-                    showingAddContact = true
-                } label: {
-                    Label("Nouveau contact", systemImage: "person.badge.plus")
-                }
-                
-                Button {
-                    showingExportOptions = true
-                } label: {
-                    Label("Exporter", systemImage: "square.and.arrow.up")
-                }
-            } label: {
-                Image(systemName: "ellipsis.circle.fill")
-                    .font(.title3)
+        .sheet(isPresented: $showingShareSheet) {
+            if let url = exportURL {
+                SystemShareSheet(items: [url])
             }
         }
     }
     
     private var filteredContacts: [Contact] {
         var contacts = contactsManager.contacts
+        
+        if let selectedType = selectedType {
+            contacts = contacts.filter { $0.type == selectedType }
+        }
         
         if !searchText.isEmpty {
             contacts = contacts.filter {
@@ -77,78 +108,83 @@ struct ContactsListView: View {
             }
         }
         
-        if let type = selectedType {
-            contacts = contacts.filter { $0.type == type }
-        }
-        
         return contacts.sorted { $0.lastName < $1.lastName }
+    }
+    
+    private func deleteContacts(at offsets: IndexSet) {
+        let contactsToDelete = offsets.map { filteredContacts[$0] }
+        Task {
+            for contact in contactsToDelete {
+                // Vérifier ici aussi si la suppression est possible avant d'appeler deleteContact
+                // Ou laisser la vue de détail gérer les dépendances complexes
+                await contactsManager.deleteContact(contact)
+            }
+        }
+    }
+    
+    private func exportToCSV() {
+        if let url = exportService.exportToCSV(.contacts, contacts: contactsManager.contacts) {
+            exportURL = url
+            showingShareSheet = true
+        }
+    }
+    
+    private func exportToVCard() {
+        if let url = exportService.exportToVCard(contacts: contactsManager.contacts) {
+            exportURL = url
+            showingShareSheet = true
+        }
+    }
+    
+    private func exportToExcel() {
+        if let url = exportService.exportToExcel(.contacts, contacts: contactsManager.contacts) {
+            exportURL = url
+            showingShareSheet = true
+        }
     }
 }
 
-// MARK: - Sous-vues
+// MARK: - Sous-composants
 private struct FilterBarView: View {
+    @Binding var searchText: String
     @Binding var selectedType: ContactType?
     
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                FilterChip(
-                    title: "Tous",
-                    icon: "person.3.fill",
-                    isSelected: selectedType == nil
-                ) {
-                    withAnimation { selectedType = nil }
-                }
+                FilterButton(title: NSLocalizedString("contacts.all", comment: "All contacts filter"), type: nil, selectedType: $selectedType)
                 
                 ForEach(ContactType.allCases, id: \.self) { type in
-                    FilterChip(
-                        title: type.localizedName,
-                        icon: type.icon,
-                        isSelected: selectedType == type
-                    ) {
-                        withAnimation { selectedType = type }
-                    }
+                    FilterButton(title: type.localizedName, type: type, selectedType: $selectedType)
                 }
             }
             .padding(.horizontal)
             .padding(.vertical, 8)
         }
-        .background(Color(UIColor.secondarySystemBackground))
+        .background(Color(UIColor.systemBackground))
+        .shadow(color: .black.opacity(0.1), radius: 1, y: 1)
     }
 }
 
-private struct ContactListContent: View {
-    let contacts: [Contact]
-    let contactsManager: ContactsManager
-    
-    private var groupedContacts: [String: [Contact]] {
-        Dictionary(grouping: contacts) { contact in
-            String(contact.lastName.prefix(1).uppercased())
-        }
-    }
+private struct FilterButton: View {
+    let title: String
+    let type: ContactType?
+    @Binding var selectedType: ContactType?
     
     var body: some View {
-        List {
-            ForEach(groupedContacts.keys.sorted(), id: \.self) { letter in
-                Section(header: 
-                    Text(letter)
-                        .font(.title3.bold())
-                        .foregroundColor(.secondary)
-                        .textCase(nil)
-                ) {
-                    ForEach(groupedContacts[letter] ?? [], id: \.id) { contact in
-                        NavigationLink(destination: ContactDetailView(
-                            contact: contact,
-                            contactsManager: contactsManager,
-                            projectManager: ProjectManager(activityLogService: ActivityLogService())
-                        )) {
-                            ContactRow(contact: contact)
-                        }
-                    }
-                }
+        Button {
+            withAnimation {
+                selectedType = type
             }
+        } label: {
+            Text(title)
+                .font(.subheadline)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(type == selectedType ? Color.blue : Color.gray.opacity(0.1))
+                .foregroundColor(type == selectedType ? .white : .primary)
+                .cornerRadius(8)
         }
-        .listStyle(.insetGrouped)
     }
 }
 
@@ -222,22 +258,12 @@ extension ContactType {
         case .partner: return .purple
         }
     }
-    
-    var localizedName: String {
-        switch self {
-        case .client: return "Client"
-        case .prospect: return "Prospect"
-        case .supplier: return "Fournisseur"
-        case .partner: return "Partenaire"
-        }
-    }
 }
 
 #Preview {
     NavigationView {
-        ContactsListView(
-            contactsManager: ContactsManager(),
-            projectManager: ProjectManager(activityLogService: ActivityLogService())
-        )
+        ContactsListView()
+            .environmentObject(ContactsManager())
+            .environmentObject(ProjectManager(activityLogService: ActivityLogService()))
     }
 } 

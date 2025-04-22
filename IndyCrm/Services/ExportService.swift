@@ -713,7 +713,7 @@ class ExportService: ObservableObject {
             // Écrire le fichier PDF
             if pdfDocument.write(to: fileURL) {
                 print("Export PDF réussi: \(fileURL.path)")
-                return fileURL
+            return fileURL
             } else {
                 print("Erreur lors de l'écriture du PDF")
                 return nil

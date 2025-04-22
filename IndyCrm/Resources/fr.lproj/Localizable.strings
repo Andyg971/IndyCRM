@@ -1,0 +1,91 @@
+// General
+"app.name" = "IndyCRM";
+"app.welcome" = "Bienvenue sur IndyCRM";
+"app.loading" = "Chargement...";
+
+// Navigation
+"nav.dashboard" = "Tableau de bord";
+"nav.contacts" = "Contacts";
+"nav.projects" = "Projets";
+"nav.invoices" = "Factures";
+"nav.settings" = "Paramètres";
+
+// Contacts
+"contacts.title" = "Contacts";
+"contacts.new" = "Nouveau Contact";
+"contacts.edit" = "Modifier le Contact";
+"contacts.delete" = "Supprimer le Contact";
+"contacts.search" = "Rechercher des Contacts";
+"contacts.empty" = "Aucun contact trouvé";
+"contacts.type.client" = "Client";
+"contacts.type.prospect" = "Prospect";
+"contacts.type.supplier" = "Fournisseur";
+"contacts.type.partner" = "Partenaire";
+"contacts.all" = "Tous";
+
+// Projects
+"projects.title" = "Projets";
+"projects.new" = "Nouveau Projet";
+"projects.edit" = "Modifier le Projet";
+"projects.delete" = "Supprimer le Projet";
+"projects.search" = "Rechercher des Projets";
+"projects.empty" = "Aucun projet trouvé";
+
+// Invoices
+"invoices.title" = "Factures";
+"invoices.new" = "Nouvelle Facture";
+"invoices.edit" = "Modifier la Facture";
+"invoices.delete" = "Supprimer la Facture";
+"invoices.search" = "Rechercher des Factures";
+"invoices.empty" = "Aucune facture trouvée";
+
+// Settings
+"settings.title" = "Paramètres";
+"settings.language" = "Langue";
+"settings.backup" = "Sauvegarde";
+"settings.restore" = "Restauration";
+"settings.theme" = "Thème";
+"Sécurité et Conformité" = "Sécurité et Conformité";
+"Tâches prioritaires" = "Tâches prioritaires";
+"Politique de confidentialité" = "Politique de confidentialité";
+
+// Actions
+"action.save" = "Enregistrer";
+"action.cancel" = "Annuler";
+"action.delete" = "Supprimer";
+"action.edit" = "Modifier";
+"action.add" = "Ajouter";
+"action.confirm" = "Confirmer";
+
+// Messages
+"message.success" = "Succès";
+"message.error" = "Erreur";
+"message.confirm" = "Êtes-vous sûr ?";
+"message.delete_confirm" = "Cette action ne peut pas être annulée.";
+
+// Backup
+"backup.create" = "Créer une sauvegarde";
+"backup.restore" = "Restaurer une sauvegarde";
+"backup.success" = "Sauvegarde créée avec succès";
+"backup.error" = "Erreur lors de la création de la sauvegarde";
+"backup.restore_success" = "Sauvegarde restaurée avec succès";
+"backup.restore_error" = "Erreur lors de la restauration de la sauvegarde";
+
+// Theme
+"settings.theme.title" = "Thème";
+"settings.theme.appearance" = "Apparence";
+"settings.theme.accent_color" = "Couleur d'accentuation";
+"settings.theme.system" = "Système";
+"settings.theme.light" = "Clair";
+"settings.theme.dark" = "Sombre";
+"settings.theme.reset" = "Réinitialiser les paramètres";
+"settings.theme.restart_needed" = "Un redémarrage de l'application peut être nécessaire pour appliquer tous les changements.";
+"settings.theme.color.blue" = "Bleu";
+"settings.theme.color.indigo" = "Indigo";
+"settings.theme.color.purple" = "Violet";
+"settings.theme.color.pink" = "Rose";
+"settings.theme.color.red" = "Rouge";
+"settings.theme.color.orange" = "Orange";
+"settings.theme.color.yellow" = "Jaune";
+"settings.theme.color.green" = "Vert";
+"settings.theme.color.teal" = "Turquoise"; 

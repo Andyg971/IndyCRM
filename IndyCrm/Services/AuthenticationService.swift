@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import AuthenticationServices
 
 /// Service gérant l'authentification des utilisateurs
 @MainActor
@@ -9,6 +10,9 @@ public class AuthenticationService: ObservableObject {
     @Published public var currentUser: User?
     @Published public var isLoading = false
     @Published public var errorMessage: String?
+    
+    // Service Apple Auth
+    private lazy var appleAuthService = AppleAuthenticationService(authService: self)
     
     // MARK: - Initialization
     public init() {
@@ -49,6 +53,32 @@ public class AuthenticationService: ObservableObject {
         isLoading = true
         errorMessage = nil
         
+        // Validation de l'email
+        guard !email.isEmpty else {
+            errorMessage = "Veuillez saisir une adresse email"
+            isLoading = false
+            return
+        }
+        
+        guard email.contains("@") && email.contains(".") else {
+            errorMessage = "Format d'email invalide"
+            isLoading = false
+            return
+        }
+        
+        // Validation du mot de passe
+        guard !password.isEmpty else {
+            errorMessage = "Veuillez saisir un mot de passe"
+            isLoading = false
+            return
+        }
+        
+        guard password.count >= 6 else {
+            errorMessage = "Le mot de passe doit contenir au moins 6 caractères"
+            isLoading = false
+            return
+        }
+        
         do {
             // Simuler un délai réseau
             try await Task.sleep(nanoseconds: 1_000_000_000)
@@ -72,8 +102,58 @@ public class AuthenticationService: ObservableObject {
         isLoading = false
     }
     
+    /// Authentification avec Apple
+    public func signInWithApple() {
+        isLoading = true
+        errorMessage = nil
+        
+        // Déléguer l'authentification au service Apple
+        appleAuthService.signInWithApple()
+    }
+    
+    /// Prépare une demande d'authentification Apple et configure le nonce
+    public func prepareAppleSignIn(request: ASAuthorizationAppleIDRequest) {
+        appleAuthService.configureRequest(request)
+    }
+    
+    /// Traite le résultat de l'authentification Apple
+    public func processAppleSignIn(credential: ASAuthorizationAppleIDCredential) {
+        isLoading = true
+        errorMessage = nil
+        
+        // Déléguer le traitement au service Apple
+        appleAuthService.processCredential(credential)
+    }
+    
+    /// Définir l'utilisateur authentifié (appelé par AppleAuthenticationService)
+    public func setAuthenticatedUser(id: String?, name: String?, email: String?) {
+        guard let id = id else {
+            errorMessage = "ID utilisateur manquant"
+            isLoading = false
+            return
+        }
+        
+        let user = User(
+            id: id,
+            name: name,
+            email: email,
+            authProvider: .apple,
+            profileImageURL: nil
+        )
+        
+        self.currentUser = user
+        self.isAuthenticated = true
+        self.saveUser(user)
+        isLoading = false
+    }
+    
     /// Déconnexion de l'utilisateur
     public func signOut() {
+        // Si l'utilisateur est connecté avec Apple, déconnecter également le service Apple
+        if currentUser?.authProvider == .apple {
+            appleAuthService.signOut()
+        }
+        
         currentUser = nil
         isAuthenticated = false
         UserDefaults.standard.removeObject(forKey: "currentUser")
@@ -108,10 +188,16 @@ public class AuthenticationService: ObservableObject {
     
     /// Restaure la session précédente
     private func restoreSession() {
-        if let userData = UserDefaults.standard.data(forKey: "currentUser"),
-           let user = try? JSONDecoder().decode(User.self, from: userData) {
-            self.currentUser = user
-            self.isAuthenticated = true
+        // Vérifier d'abord si l'utilisateur avait une session Apple
+        appleAuthService.loadSavedSession()
+        
+        // Si pas de session Apple, vérifier les autres méthodes
+        if !isAuthenticated {
+            if let userData = UserDefaults.standard.data(forKey: "currentUser"),
+               let user = try? JSONDecoder().decode(User.self, from: userData) {
+                self.currentUser = user
+                self.isAuthenticated = true
+            }
         }
     }
     

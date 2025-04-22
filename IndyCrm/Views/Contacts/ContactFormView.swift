@@ -309,10 +309,12 @@ struct ContactFormView: View {
             organization: organization.trim()
         )
         
-        if isEditing {
-            contactsManager.updateContact(contact)
-        } else {
-            contactsManager.addContact(contact)
+        Task {
+            if isEditing {
+                await contactsManager.updateContact(contact)
+            } else {
+                await contactsManager.addContact(contact)
+            }
         }
         
         dismiss()
@@ -329,9 +331,17 @@ struct ContactFormView: View {
                 return
             }
             
-            contactsManager.deleteContact(contact)
+            Task {
+                await contactsManager.deleteContact(contact)
+                // Revenir sur le fil principal pour les mises à jour de l'interface utilisateur
+                await MainActor.run {
+                    // Appliquer l'animation après la suppression réussie
+                    withAnimation {
+                        dismiss()
+                    }
+                }
+            }
         }
-        dismiss()
     }
     
     private struct Dependency {
@@ -383,10 +393,15 @@ struct ContactFormView: View {
             title: "Forcer la suppression",
             style: .destructive
         ) { _ in
-            withAnimation(.spring(response: 0.3)) {
+            Task {
                 guard let contact = editingContact else { return }
-                contactsManager.deleteContact(contact)
-                dismiss()
+                await contactsManager.deleteContact(contact)
+                // Dismiss on main thread AFTER successful deletion
+                await MainActor.run {
+                    withAnimation(.spring(response: 0.3)) {
+                        dismiss()
+                    }
+                }
             }
         })
         
@@ -396,9 +411,13 @@ struct ContactFormView: View {
         }
     }
     
+    // MARK: - Cette fonction n'est pas utilisée et fait référence à un type non défini
+    // Commenter ou supprimer si elle n'est plus nécessaire
+    /*
     private func priorityColor(_ priority: Priority) -> Color {
         priority.statusColor
     }
+    */
 }
 
 struct RateRow: View {

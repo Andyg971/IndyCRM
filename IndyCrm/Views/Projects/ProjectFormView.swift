@@ -121,10 +121,12 @@ struct ProjectFormView: View {
             notes: notes
         )
         
-        if editingProject != nil {
-            projectManager.updateProject(project)
-        } else {
-            projectManager.addProject(project)
+        Task {
+            if editingProject != nil {
+                await projectManager.updateProject(project)
+            } else {
+                await projectManager.addProject(project)
+            }
         }
         
         dismiss()

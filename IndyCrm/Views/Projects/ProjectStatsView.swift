@@ -283,9 +283,9 @@ struct ProjectStatsView: View {
                     
                     ModernProgressBar(
                         progress: timeProgress,
-                        isPaused: project.status == .onHold
+                        isPaused: project.status == .onHold,
+                        height: 16
                     )
-                    .frame(height: 20)
                     
                     // Détails sous la barre
                     HStack {

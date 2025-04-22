@@ -5,7 +5,7 @@ import UIKit
 
 // MARK: - Main View
 struct InvoiceDetailView: View {
-    let invoice: Invoice
+    @State var invoice: Invoice
     @ObservedObject var invoiceManager: InvoiceManager
     @ObservedObject var contactsManager: ContactsManager
     @State private var showingEditSheet = false
@@ -13,6 +13,8 @@ struct InvoiceDetailView: View {
     @State private var pdfURL: URL?
     @State private var showingAlert = false
     @State private var alertMessage = ""
+    @State private var showingStatusAlert = false
+    @State private var selectedStatus: InvoiceStatus?
     
     var client: Contact? {
         contactsManager.contacts.first(where: { $0.id == invoice.clientId })
@@ -107,6 +109,14 @@ struct InvoiceDetailView: View {
         } message: {
             Text(alertMessage)
         }
+        .alert("Confirmer le changement de statut", isPresented: $showingStatusAlert) {
+            Button(selectedStatus?.rawValue ?? "", role: .destructive) {
+                updateStatus(selectedStatus ?? .draft)
+            }
+            Button("Annuler", role: .cancel) {}
+        } message: {
+            Text("Voulez-vous vraiment changer le statut de cette facture en \"\(selectedStatus?.rawValue ?? "")\" ?")
+        }
     }
     
     private var toolbarContent: some ToolbarContent {
@@ -117,12 +127,14 @@ struct InvoiceDetailView: View {
                 }
                 
                 Button("Marquer comme payée") {
-                    updateStatus(.paid)
+                    selectedStatus = .paid
+                    showingStatusAlert = true
                 }
                 .disabled(invoice.status == .paid)
                 
                 Button("Marquer comme envoyée") {
-                    updateStatus(.sent)
+                    selectedStatus = .sent
+                    showingStatusAlert = true
                 }
                 .disabled(invoice.status == .sent || invoice.status == .paid)
                 
@@ -135,26 +147,37 @@ struct InvoiceDetailView: View {
         }
     }
     
-    private func updateStatus(_ status: InvoiceStatus) {
+    private func updateStatus(_ newStatus: InvoiceStatus) {
         var updatedInvoice = invoice
-        updatedInvoice.status = status
-        invoiceManager.updateInvoice(updatedInvoice)
-        
-        // Afficher une confirmation
-        alertMessage = "Facture marquée comme \(status.rawValue.lowercased())"
-        showingAlert = true
-        
-        // Si la facture est marquée comme payée, programmer une notification de remerciement
-        if status == .paid {
-            let content = UNMutableNotificationContent()
-            content.title = "Paiement reçu"
-            content.body = "Le paiement de la facture \(invoice.number) a été reçu. Pensez à remercier votre client !"
-            content.sound = .default
-            
-            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 3600, repeats: false) // Rappel dans 1h
-            let request = UNNotificationRequest(identifier: "payment-thanks-\(invoice.id)", content: content, trigger: trigger)
-            
-            UNUserNotificationCenter.current().add(request)
+        updatedInvoice.status = newStatus
+        updatedInvoice.updatedAt = Date() // Update the modification date
+        // Wrap the asynchronous call in a Task
+        Task {
+            do {
+                await invoiceManager.updateInvoice(updatedInvoice)
+                print("Statut de la facture mis à jour avec succès.")
+                self.invoice = updatedInvoice // Mettre à jour la vue locale
+                alertMessage = NSLocalizedString("Facture marquée comme ", comment: "Alert message prefix") + newStatus.rawValue.lowercased()
+                showingAlert = true
+                
+                // Si la facture est marquée comme payée, programmer une notification de remerciement
+                if newStatus == .paid {
+                    let content = UNMutableNotificationContent()
+                    content.title = NSLocalizedString("Paiement reçu", comment: "Notification title")
+                    content.body = String(format: NSLocalizedString("Le paiement de la facture %@ a été reçu. Pensez à remercier votre client !", comment: "Notification body"), invoice.number)
+                    content.sound = .default
+                    
+                    let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 3600, repeats: false) // Rappel dans 1h
+                    let request = UNNotificationRequest(identifier: "payment-thanks-\(invoice.id)", content: content, trigger: trigger)
+                    
+                    try await UNUserNotificationCenter.current().add(request)
+                }
+            } catch {
+                print("Erreur lors de la mise à jour du statut de la facture: \(error.localizedDescription)")
+                // Afficher une alerte à l'utilisateur
+                alertMessage = NSLocalizedString("Erreur lors de la mise à jour : ", comment: "Alert message prefix for update error") + error.localizedDescription
+                showingAlert = true
+            }
         }
     }
     
@@ -162,6 +185,12 @@ struct InvoiceDetailView: View {
         let clientName = client?.fullName ?? "Client inconnu"
         if let url = invoiceManager.exportInvoiceToPDF(invoice, clientName: clientName) {
             pdfURL = url
+            // Changer le statut à Envoyée si elle était en Brouillon
+            if invoice.status == .draft {
+                // Pas besoin d'alerte de confirmation ici, car l'export implique l'envoi
+                updateStatus(.sent)
+            }
+            // Afficher la feuille de partage après la mise à jour éventuelle du statut
             showingExportSheet = true
         } else {
             alertMessage = "Erreur lors de l'export PDF"
