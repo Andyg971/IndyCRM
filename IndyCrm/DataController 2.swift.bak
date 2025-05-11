@@ -37,9 +37,9 @@ class DataController: ObservableObject {
         // Configuration du stockage
         if inMemory {
             container.persistentStoreDescriptions.first?.url = URL(fileURLWithPath: "/dev/null")
-            LoggingService.info("Initialisation du DataController en mode mémoire")
+            print("Initialisation du DataController en mode mémoire")
         } else {
-            LoggingService.info("Initialisation du DataController avec stockage persistant")
+            print("Initialisation du DataController avec stockage persistant")
         }
         
         // Configuration de CloudKit
@@ -48,16 +48,16 @@ class DataController: ObservableObject {
             description.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
             // Active le suivi de l'historique pour la synchronisation
             description.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
-            LoggingService.debug("Configuration CloudKit activée")
+            print("Configuration CloudKit activée")
         }
         
         // Chargement des stores persistants
         container.loadPersistentStores { description, error in
             if let error = error {
-                LoggingService.critical("Erreur fatale lors du chargement de Core Data: \(error.localizedDescription)")
+                print("Erreur fatale lors du chargement de Core Data: \(error.localizedDescription)")
                 fatalError("Impossible de charger Core Data: \(error.localizedDescription)")
             }
-            LoggingService.info("Stores persistants chargés avec succès")
+            print("Stores persistants chargés avec succès")
         }
         
         // Configuration de la fusion automatique des changements
@@ -72,13 +72,13 @@ class DataController: ObservableObject {
             name: .NSPersistentStoreRemoteChange,
             object: nil
         )
-        LoggingService.debug("Observateur de changements CloudKit configuré")
+        print("Observateur de changements CloudKit configuré")
     }
     
     /// Traite les changements reçus de CloudKit
     /// Cette méthode est appelée automatiquement lorsque des modifications sont synchronisées depuis d'autres appareils
     @objc private func processRemoteChanges(_ notification: Notification) {
-        LoggingService.info("Changements distants détectés via CloudKit")
+        print("Changements distants détectés via CloudKit")
         // Notifie l'interface utilisateur des changements
         DispatchQueue.main.async {
             self.objectWillChange.send()
@@ -94,10 +94,10 @@ class DataController: ObservableObject {
         if context.hasChanges {
             do {
                 try context.save()
-                LoggingService.info("Données sauvegardées avec succès")
+                print("Données sauvegardées avec succès")
             } catch {
-                LoggingService.error("Échec de la sauvegarde des données")
-                error.log()
+                print("Échec de la sauvegarde des données")
+                print(error)
             }
         }
     }
@@ -108,10 +108,14 @@ class DataController: ObservableObject {
     /// - Un projet associé
     /// - Une facture avec un élément
     func createSampleData() {
-        LoggingService.info("Création des données d'exemple")
-        let viewContext = container.viewContext
-        
-        // Création d'un client exemple avec des informations de base
+        print("Création des données d'exemple")
+        // let viewContext = container.viewContext // Ligne supprimée car non utilisée
+
+        // Les entités Client, Project, Invoice, InvoiceItem sont des struct Swift et non des NSManagedObject.
+        // Il n'est pas possible de les instancier avec un contexte Core Data.
+        // Si tu veux utiliser Core Data, il faut générer les entités dans Xcode (Editor > Create NSManagedObject Subclass...)
+        // Exemple de code Core Data commenté :
+        /*
         let client = Client(context: viewContext)
         client.id = UUID()
         client.name = "Entreprise Exemple"
@@ -120,9 +124,8 @@ class DataController: ObservableObject {
         client.address = "123 Rue de l'Exemple, 75000 Paris"
         client.notes = "Client fidèle depuis 2020"
         client.dateCreated = Date()
-        LoggingService.debug("Client exemple créé: \(client.name)")
-        
-        // Création d'un projet exemple lié au client
+        print("Client exemple créé: \(client.name)")
+
         let project = Project(context: viewContext)
         project.id = UUID()
         project.title = "Refonte du site web"
@@ -131,9 +134,8 @@ class DataController: ObservableObject {
         project.dateCreated = Date()
         project.deadline = Calendar.current.date(byAdding: .month, value: 2, to: Date())
         project.status = "En cours"
-        LoggingService.debug("Projet exemple créé: \(project.title)")
-        
-        // Création d'une facture exemple liée au client et au projet
+        print("Projet exemple créé: \(project.title)")
+
         let invoice = Invoice(context: viewContext)
         invoice.id = UUID()
         invoice.invoiceNumber = "FACT-2023-001"
@@ -143,9 +145,8 @@ class DataController: ObservableObject {
         invoice.dateDue = Calendar.current.date(byAdding: .day, value: 30, to: Date())
         invoice.status = "En attente"
         invoice.totalAmount = 1500.0
-        LoggingService.debug("Facture exemple créée: \(invoice.invoiceNumber)")
-        
-        // Création d'un élément de facture exemple
+        print("Facture exemple créée: \(invoice.invoiceNumber)")
+
         let invoiceItem = InvoiceItem(context: viewContext)
         invoiceItem.id = UUID()
         invoiceItem.invoice = invoice
@@ -153,17 +154,16 @@ class DataController: ObservableObject {
         invoiceItem.quantity = 5
         invoiceItem.unitPrice = 300.0
         invoiceItem.amount = 1500.0
-        
-        // Sauvegarde de toutes les données créées
-        save()
-        LoggingService.info("Données d'exemple créées avec succès")
+        */
+
+        print("Impossible de créer des exemples : les entités ne sont pas des NSManagedObject.")
     }
     
     /// Supprime toutes les données de l'application
     /// ⚠️ ATTENTION : Cette opération est irréversible
     /// Utilisée principalement pour les tests ou la réinitialisation complète
     func deleteAllData() {
-        LoggingService.warning("Suppression de toutes les données en cours")
+        print("Suppression de toutes les données en cours")
         let entities = container.managedObjectModel.entities
         
         // Suppression de chaque entité une par une
@@ -174,14 +174,14 @@ class DataController: ObservableObject {
                 
                 do {
                     try container.viewContext.execute(deleteRequest)
-                    LoggingService.debug("Entité \(entityName) supprimée")
+                    print("Entité \(entityName) supprimée")
                 } catch {
-                    LoggingService.error("Erreur lors de la suppression de l'entité \(entityName)")
-                    error.log()
+                    print("Erreur lors de la suppression de l'entité \(entityName)")
+                    print(error)
                 }
             }
         }
-        LoggingService.info("Suppression de toutes les données terminée")
+        print("Suppression de toutes les données terminée")
     }
     
     /// Supprime un client (et toutes ses données associées) via Core Data
@@ -194,12 +194,12 @@ class DataController: ObservableObject {
             if let client = try context.fetch(fetchRequest).first as? NSManagedObject {
                 context.delete(client)
                 save() // La suppression en cascade s'applique automatiquement
-                LoggingService.info("Client supprimé avec succès (id: \(id))")
+                print("Client supprimé avec succès (id: \(id))")
             } else {
-                LoggingService.warning("Aucun client trouvé avec l'id: \(id)")
+                print("Aucun client trouvé avec l'id: \(id)")
             }
         } catch {
-            LoggingService.error("Erreur lors de la suppression du client: \(error.localizedDescription)")
+            print("Erreur lors de la suppression du client: \(error.localizedDescription)")
         }
     }
 
@@ -213,12 +213,12 @@ class DataController: ObservableObject {
             if let invoice = try context.fetch(fetchRequest).first as? NSManagedObject {
                 context.delete(invoice)
                 save() // La suppression en cascade s'applique automatiquement
-                LoggingService.info("Facture supprimée avec succès (id: \(id))")
+                print("Facture supprimée avec succès (id: \(id))")
             } else {
-                LoggingService.warning("Aucune facture trouvée avec l'id: \(id)")
+                print("Aucune facture trouvée avec l'id: \(id)")
             }
         } catch {
-            LoggingService.error("Erreur lors de la suppression de la facture: \(error.localizedDescription)")
+            print("Erreur lors de la suppression de la facture: \(error.localizedDescription)")
         }
     }
 } 

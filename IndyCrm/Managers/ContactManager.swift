@@ -158,4 +158,20 @@ public class ContactsManager: ObservableObject {
         await saveContacts()
         print("👤 Contacts restaurés depuis la sauvegarde")
     }
+
+    /// Supprime un contact et toutes ses données associées (projets, factures)
+    public func deleteContactAndCascade(_ contact: Contact, projectManager: ProjectManager, invoiceManager: InvoiceManager) async {
+        // 1. Supprimer toutes les factures liées à ce contact
+        let invoicesToDelete = invoiceManager.invoices.filter { $0.clientId == contact.id }
+        for invoice in invoicesToDelete {
+            await invoiceManager.deleteInvoice(invoice)
+        }
+        // 2. Supprimer tous les projets liés à ce contact
+        let projectsToDelete = projectManager.projects.filter { $0.clientId == contact.id }
+        for project in projectsToDelete {
+            await projectManager.deleteProject(project)
+        }
+        // 3. Supprimer le contact lui-même
+        await deleteContact(contact)
+    }
 } 

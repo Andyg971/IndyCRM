@@ -65,7 +65,7 @@ struct ContactListView: View {
                         showDeletionErrorAlert(for: contact)
                     } else {
                         Task {
-                            await contactsManager.deleteContact(contact)
+                            DataController.shared.deleteClient(by: contact.id)
                         }
                     }
                 }

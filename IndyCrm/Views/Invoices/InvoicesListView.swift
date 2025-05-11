@@ -133,7 +133,7 @@ struct InvoicesListView: View {
     
     private func deleteInvoice(_ invoice: Invoice) {
         Task {
-            await invoiceManager.deleteInvoice(invoice)
+            DataController.shared.deleteInvoice(by: invoice.id)
             invoiceToDelete = nil
         }
     }
