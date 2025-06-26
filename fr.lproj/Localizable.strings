@@ -1,0 +1,24 @@
+// Traductions françaises
+"settings" = "Paramètres";
+"language" = "Langue";
+"french" = "Français";
+"english" = "Anglais";
+"save" = "Enregistrer";
+"cancel" = "Annuler";
+"invoice" = "Facture";
+"client" = "Client";
+"amount" = "Montant";
+"date" = "Date";
+"description" = "Description";
+"projects" = "Projets";
+"projects.title" = "Projets";
+"projects.new" = "Nouveau projet";
+"projects.empty" = "Aucun projet";
+"projects.search" = "Rechercher un projet";
+"nav.dashboard" = "Tableau de bord";
+"nav.contacts" = "Contacts";
+"nav.projects" = "Projets";
+"nav.invoices" = "Factures";
+"nav.settings" = "Paramètres";
+"message.confirm" = "Confirmation";
+"message.delete_confirm" = "Êtes-vous sûr de vouloir supprimer ce projet ?";

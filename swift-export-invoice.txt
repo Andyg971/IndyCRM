@@ -1,0 +1,675 @@
+import UIKit
+import PDFKit
+import UniformTypeIdentifiers
+
+// MARK: - Énumération pour la gestion d'erreurs
+
+enum InvoiceExportError: Error {
+    case pdfGenerationFailed
+    case csvGenerationFailed
+    case fileWriteFailed
+    case invalidDirectoryAccess
+    
+    var localizedDescription: String {
+        switch self {
+        case .pdfGenerationFailed:
+            return "Échec de la génération du fichier PDF"
+        case .csvGenerationFailed:
+            return "Échec de la génération du fichier CSV"
+        case .fileWriteFailed:
+            return "Échec de l'écriture du fichier"
+        case .invalidDirectoryAccess:
+            return "Impossible d'accéder au répertoire de destination"
+        }
+    }
+}
+
+// MARK: - Modèles de données
+
+struct Invoice {
+    let invoiceNumber: String
+    let dateIssued: Date
+    let dueDate: Date
+    let clientName: String
+    let clientAddress: String
+    let items: [InvoiceItem]
+    let taxRate: Double
+    let yourCompanyInfo: CompanyInfo
+    
+    var subtotal: Double {
+        items.reduce(0) { $0 + $1.total }
+    }
+    
+    var taxAmount: Double {
+        subtotal * taxRate
+    }
+    
+    var total: Double {
+        subtotal + taxAmount
+    }
+}
+
+struct CompanyInfo {
+    let name: String
+    let address: String
+    let postalCode: String
+    let city: String
+    let phone: String
+    let email: String
+    let vatNumber: String
+    
+    var formattedAddress: String {
+        return """
+        \(name)
+        \(address)
+        \(postalCode), \(city)
+        Tél: \(phone)
+        Email: \(email)
+        N° TVA: \(vatNumber)
+        """
+    }
+}
+
+struct InvoiceItem {
+    let description: String
+    let quantity: Int
+    let unitPrice: Double
+    let vatRate: Double
+    
+    var total: Double {
+        Double(quantity) * unitPrice
+    }
+}
+
+// MARK: - Date Formatter
+
+class DateFormatterManager {
+    static let shared = DateFormatterManager()
+    
+    private init() {}
+    
+    // Date formatter pour l'affichage standard
+    lazy var displayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        formatter.locale = Locale(identifier: "fr_FR")
+        return formatter
+    }()
+    
+    // Date formatter pour l'export CSV
+    lazy var csvFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+    
+    // Currency formatter
+    lazy var currencyFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.locale = Locale(identifier: "fr_FR")
+        return formatter
+    }()
+    
+    // Format pour pourcentage
+    lazy var percentFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .percent
+        formatter.minimumFractionDigits = 1
+        formatter.maximumFractionDigits = 1
+        return formatter
+    }()
+    
+    func formatCurrency(_ amount: Double) -> String {
+        return currencyFormatter.string(from: NSNumber(value: amount)) ?? "0,00 €"
+    }
+    
+    func formatDate(_ date: Date, for type: ExportType) -> String {
+        switch type {
+        case .pdf:
+            return displayFormatter.string(from: date)
+        case .csv:
+            return csvFormatter.string(from: date)
+        }
+    }
+    
+    func formatPercent(_ value: Double) -> String {
+        return percentFormatter.string(from: NSNumber(value: value)) ?? "0,0%"
+    }
+}
+
+enum ExportType {
+    case pdf
+    case csv
+}
+
+// MARK: - PDF Exporter
+
+class InvoiceExporter {
+    
+    // Configuration PDF
+    private struct PDFConfig {
+        static let pageWidth: CGFloat = 8.5 * 72.0
+        static let pageHeight: CGFloat = 11 * 72.0
+        static let margin: CGFloat = 36.0
+        static let headerY: CGFloat = 80.0
+        static let clientInfoY: CGFloat = 200.0
+        static let tableHeaderY: CGFloat = 300.0
+        static let tableStartY: CGFloat = 320.0
+        static let rowHeight: CGFloat = 20.0
+    }
+    
+    private let dateManager = DateFormatterManager.shared
+    
+    // MARK: - PDF Export
+    
+    func exportToPDF(invoice: Invoice) throws -> Data {
+        // Créer un nouveau document PDF
+        let pdfMetaData = [
+            kCGPDFContextCreator: invoice.yourCompanyInfo.name,
+            kCGPDFContextAuthor: invoice.yourCompanyInfo.name,
+            kCGPDFContextTitle: "Facture \(invoice.invoiceNumber)"
+        ]
+        
+        let format = UIGraphicsPDFRendererFormat()
+        format.documentInfo = pdfMetaData as [String: Any]
+        
+        let pageRect = CGRect(x: 0, y: 0, width: PDFConfig.pageWidth, height: PDFConfig.pageHeight)
+        
+        let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
+        
+        do {
+            let data = renderer.pdfData { (context) in
+                context.beginPage()
+                
+                self.drawPageContent(pageRect: pageRect, invoice: invoice, context: context)
+            }
+            return data
+        } catch {
+            throw InvoiceExportError.pdfGenerationFailed
+        }
+    }
+    
+    private func drawPageContent(pageRect: CGRect, invoice: Invoice, context: UIGraphicsPDFRendererContext) {
+        // Définition des styles de texte
+        let titleFont = UIFont.boldSystemFont(ofSize: 24.0)
+        let titleAttributes: [NSAttributedString.Key: Any] = [.font: titleFont]
+        
+        let headerFont = UIFont.boldSystemFont(ofSize: 12.0)
+        let textFont = UIFont.systemFont(ofSize: 12.0)
+        
+        let headerAttributes: [NSAttributedString.Key: Any] = [.font: headerFont]
+        let textAttributes: [NSAttributedString.Key: Any] = [.font: textFont]
+        
+        // Titre de facture
+        let title = "FACTURE"
+        let titleStringSize = title.size(withAttributes: titleAttributes)
+        
+        let titleRect = CGRect(
+            x: (pageRect.width - titleStringSize.width) / 2.0,
+            y: 36,
+            width: titleStringSize.width,
+            height: titleStringSize.height
+        )
+        
+        title.draw(in: titleRect, withAttributes: titleAttributes)
+        
+        // Logo de l'entreprise (si disponible)
+        // Pour ajouter un logo, décommentez et complétez le code ci-dessous
+        /*
+        if let logoImage = UIImage(named: "company_logo") {
+            let logoSize = CGSize(width: 100, height: 50)
+            let logoRect = CGRect(x: PDFConfig.margin, y: 36, width: logoSize.width, height: logoSize.height)
+            logoImage.draw(in: logoRect)
+        }
+        */
+        
+        // Informations de l'entreprise
+        let companyRect = CGRect(x: PDFConfig.margin, y: PDFConfig.headerY, width: 250, height: 100)
+        invoice.yourCompanyInfo.formattedAddress.draw(in: companyRect, withAttributes: textAttributes)
+        
+        // Informations de la facture
+        let invoiceInfo = """
+        Facture N°: \(invoice.invoiceNumber)
+        Date d'émission: \(dateManager.formatDate(invoice.dateIssued, for: .pdf))
+        Date d'échéance: \(dateManager.formatDate(invoice.dueDate, for: .pdf))
+        """
+        
+        let invoiceInfoRect = CGRect(
+            x: pageRect.width - 250 - PDFConfig.margin,
+            y: PDFConfig.headerY,
+            width: 250,
+            height: 100
+        )
+        invoiceInfo.draw(in: invoiceInfoRect, withAttributes: textAttributes)
+        
+        // Informations du client
+        let clientTitle = "FACTURER À:"
+        clientTitle.draw(at: CGPoint(x: PDFConfig.margin, y: PDFConfig.clientInfoY), withAttributes: headerAttributes)
+        
+        let clientInfo = "\(invoice.clientName)\n\(invoice.clientAddress)"
+        let clientInfoRect = CGRect(x: PDFConfig.margin, y: PDFConfig.clientInfoY + 15, width: 250, height: 100)
+        clientInfo.draw(in: clientInfoRect, withAttributes: textAttributes)
+        
+        // Tableau des articles
+        self.drawTableHeader(pageRect: pageRect, y: PDFConfig.tableHeaderY)
+        var currentY = PDFConfig.tableStartY
+        
+        for (index, item) in invoice.items.enumerated() {
+            currentY = self.drawTableRow(pageRect: pageRect, y: currentY, item: item, index: index)
+        }
+        
+        // Résumé des totaux
+        currentY = drawTotals(pageRect: pageRect, y: currentY + 20, invoice: invoice, textAttributes: textAttributes, headerAttributes: headerAttributes)
+        
+        // Mentions légales
+        drawLegalInformation(pageRect: pageRect, y: currentY + 60, textAttributes: textAttributes)
+        
+        // Numéro de page
+        drawPageNumber(pageRect: pageRect, textAttributes: textAttributes, context: context)
+    }
+    
+    private func drawTableHeader(pageRect: CGRect, y: CGFloat) {
+        let headerFont = UIFont.boldSystemFont(ofSize: 12.0)
+        let headerAttributes: [NSAttributedString.Key: Any] = [
+            .font: headerFont
+        ]
+        
+        // Dessiner une ligne pour l'en-tête du tableau
+        let context = UIGraphicsGetCurrentContext()
+        context?.setStrokeColor(UIColor.black.cgColor)
+        context?.setLineWidth(1.0)
+        context?.move(to: CGPoint(x: PDFConfig.margin, y: y - 5))
+        context?.addLine(to: CGPoint(x: pageRect.width - PDFConfig.margin, y: y - 5))
+        context?.strokePath()
+        
+        // Colonnes
+        let description = "Description"
+        let descriptionRect = CGRect(x: PDFConfig.margin, y: y, width: pageRect.width - 250, height: 20)
+        description.draw(in: descriptionRect, withAttributes: headerAttributes)
+        
+        let quantity = "Qté"
+        let quantityRect = CGRect(x: pageRect.width - 210, y: y, width: 40, height: 20)
+        quantity.draw(in: quantityRect, withAttributes: headerAttributes)
+        
+        let unitPrice = "Prix unitaire"
+        let unitPriceRect = CGRect(x: pageRect.width - 170, y: y, width: 90, height: 20)
+        unitPrice.draw(in: unitPriceRect, withAttributes: headerAttributes)
+        
+        let total = "Total"
+        let totalRect = CGRect(x: pageRect.width - 80, y: y, width: 80, height: 20)
+        total.draw(in: totalRect, withAttributes: headerAttributes)
+        
+        // Dessiner une ligne après l'en-tête
+        context?.setStrokeColor(UIColor.black.cgColor)
+        context?.setLineWidth(1.0)
+        context?.move(to: CGPoint(x: PDFConfig.margin, y: y + 15))
+        context?.addLine(to: CGPoint(x: pageRect.width - PDFConfig.margin, y: y + 15))
+        context?.strokePath()
+    }
+    
+    private func drawTableRow(pageRect: CGRect, y: CGFloat, item: InvoiceItem, index: Int) -> CGFloat {
+        let textFont = UIFont.systemFont(ofSize: 12.0)
+        let textAttributes: [NSAttributedString.Key: Any] = [
+            .font: textFont
+        ]
+        
+        // Couleur de fond alternée pour les lignes du tableau
+        if index % 2 == 1 {
+            let context = UIGraphicsGetCurrentContext()
+            context?.setFillColor(UIColor(white: 0.95, alpha: 1.0).cgColor)
+            context?.fill(CGRect(x: PDFConfig.margin, y: y - 5, width: pageRect.width - (PDFConfig.margin * 2), height: 25))
+        }
+        
+        // Description (avec troncature si trop longue)
+        let description = item.description
+        let descriptionRect = CGRect(x: PDFConfig.margin, y: y, width: pageRect.width - 250, height: 20)
+        description.draw(in: descriptionRect, withAttributes: textAttributes)
+        
+        // Quantité
+        let quantityText = "\(item.quantity)"
+        let quantityRect = CGRect(x: pageRect.width - 210, y: y, width: 40, height: 20)
+        quantityText.draw(in: quantityRect, withAttributes: textAttributes)
+        
+        // Prix unitaire
+        let unitPriceText = dateManager.formatCurrency(item.unitPrice)
+        let unitPriceRect = CGRect(x: pageRect.width - 170, y: y, width: 90, height: 20)
+        unitPriceText.draw(in: unitPriceRect, withAttributes: textAttributes)
+        
+        // Total
+        let totalText = dateManager.formatCurrency(item.total)
+        let totalRect = CGRect(x: pageRect.width - 80, y: y, width: 80, height: 20)
+        totalText.draw(in: totalRect, withAttributes: textAttributes)
+        
+        return y + PDFConfig.rowHeight
+    }
+    
+    private func drawTotals(pageRect: CGRect, y: CGFloat, invoice: Invoice, textAttributes: [NSAttributedString.Key: Any], headerAttributes: [NSAttributedString.Key: Any]) -> CGFloat {
+        var currentY = y
+        
+        // Dessiner une ligne avant les totaux
+        let context = UIGraphicsGetCurrentContext()
+        context?.setStrokeColor(UIColor.black.cgColor)
+        context?.setLineWidth(1.0)
+        context?.move(to: CGPoint(x: pageRect.width - 180, y: currentY - 5))
+        context?.addLine(to: CGPoint(x: pageRect.width - PDFConfig.margin, y: currentY - 5))
+        context?.strokePath()
+        
+        // Sous-total
+        let subtotalText = "Sous-total:"
+        let subtotalRect = CGRect(x: pageRect.width - 180, y: currentY, width: 100, height: 20)
+        subtotalText.draw(in: subtotalRect, withAttributes: headerAttributes)
+        
+        let subtotalValueText = dateManager.formatCurrency(invoice.subtotal)
+        let subtotalValueRect = CGRect(x: pageRect.width - 80, y: currentY, width: 80, height: 20)
+        subtotalValueText.draw(in: subtotalValueRect, withAttributes: textAttributes)
+        
+        currentY += PDFConfig.rowHeight
+        
+        // TVA
+        let taxText = "TVA (\(Int(invoice.taxRate * 100))%):"
+        let taxRect = CGRect(x: pageRect.width - 180, y: currentY, width: 100, height: 20)
+        taxText.draw(in: taxRect, withAttributes: headerAttributes)
+        
+        let taxValueText = dateManager.formatCurrency(invoice.taxAmount)
+        let taxValueRect = CGRect(x: pageRect.width - 80, y: currentY, width: 80, height: 20)
+        taxValueText.draw(in: taxValueRect, withAttributes: textAttributes)
+        
+        currentY += PDFConfig.rowHeight
+        
+        // Total
+        let totalText = "Total:"
+        let totalRect = CGRect(x: pageRect.width - 180, y: currentY, width: 100, height: 20)
+        totalText.draw(in: totalRect, withAttributes: headerAttributes)
+        
+        // Mettre en évidence le total
+        let totalBackgroundRect = CGRect(x: pageRect.width - 80, y: currentY, width: 80, height: 20)
+        context?.setFillColor(UIColor(red: 0.9, green: 0.9, blue: 1.0, alpha: 1.0).cgColor)
+        context?.fill(totalBackgroundRect)
+        
+        let totalValueText = dateManager.formatCurrency(invoice.total)
+        let totalValueRect = CGRect(x: pageRect.width - 80, y: currentY, width: 80, height: 20)
+        
+        let boldFont = UIFont.boldSystemFont(ofSize: 14.0)
+        let boldAttributes: [NSAttributedString.Key: Any] = [
+            .font: boldFont
+        ]
+        
+        totalValueText.draw(in: totalValueRect, withAttributes: boldAttributes)
+        
+        return currentY
+    }
+    
+    private func drawLegalInformation(pageRect: CGRect, y: CGFloat, textAttributes: [NSAttributedString.Key: Any]) {
+        let legalText = """
+        Merci pour votre confiance. Conditions de paiement : paiement à réception de facture.
+        En cas de retard de paiement, une pénalité de 3 fois le taux d'intérêt légal sera appliquée.
+        Indemnité forfaitaire pour frais de recouvrement en cas de retard de paiement : 40€
+        """
+        
+        let legalRect = CGRect(
+            x: PDFConfig.margin,
+            y: y,
+            width: pageRect.width - (PDFConfig.margin * 2),
+            height: 60
+        )
+        
+        legalText.draw(in: legalRect, withAttributes: textAttributes)
+    }
+    
+    private func drawPageNumber(pageRect: CGRect, textAttributes: [NSAttributedString.Key: Any], context: UIGraphicsPDFRendererContext) {
+        let pageText = "Page \(context.pdfContextBounds.page + 1)"
+        let pageTextSize = pageText.size(withAttributes: textAttributes)
+        let pageTextRect = CGRect(
+            x: (pageRect.width - pageTextSize.width) / 2,
+            y: pageRect.height - 30,
+            width: pageTextSize.width,
+            height: pageTextSize.height
+        )
+        
+        pageText.draw(in: pageTextRect, withAttributes: textAttributes)
+    }
+    
+    // MARK: - CSV Export
+    
+    func exportToCSV(invoice: Invoice) throws -> String {
+        do {
+            var csvContent = "Numéro de facture,Date d'émission,Date d'échéance,Client,Adresse client,Sous-total,Taux de TVA,Montant TVA,Total\n"
+            
+            // Ligne d'en-tête pour la facture
+            csvContent += "\(invoice.invoiceNumber),"
+            csvContent += "\(dateManager.formatDate(invoice.dateIssued, for: .csv)),"
+            csvContent += "\(dateManager.formatDate(invoice.dueDate, for: .csv)),"
+            csvContent += "\"\(escapeCSVField(invoice.clientName))\","
+            csvContent += "\"\(escapeCSVField(invoice.clientAddress))\","
+            csvContent += "\(invoice.subtotal),"
+            csvContent += "\(invoice.taxRate),"
+            csvContent += "\(invoice.taxAmount),"
+            csvContent += "\(invoice.total)\n\n"
+            
+            // En-tête pour les articles
+            csvContent += "Description,Quantité,Prix unitaire,Taux TVA,Total\n"
+            
+            // Détails des articles
+            for item in invoice.items {
+                csvContent += "\"\(escapeCSVField(item.description))\","
+                csvContent += "\(item.quantity),"
+                csvContent += "\(item.unitPrice),"
+                csvContent += "\(item.vatRate),"
+                csvContent += "\(item.total)\n"
+            }
+            
+            // Informations de l'entreprise
+            csvContent += "\n\"Informations de l'entreprise\"\n"
+            csvContent += "Nom,\"\(escapeCSVField(invoice.yourCompanyInfo.name))\"\n"
+            csvContent += "Adresse,\"\(escapeCSVField(invoice.yourCompanyInfo.address))\"\n"
+            csvContent += "Code postal,\"\(escapeCSVField(invoice.yourCompanyInfo.postalCode))\"\n"
+            csvContent += "Ville,\"\(escapeCSVField(invoice.yourCompanyInfo.city))\"\n"
+            csvContent += "Téléphone,\"\(escapeCSVField(invoice.yourCompanyInfo.phone))\"\n"
+            csvContent += "Email,\"\(escapeCSVField(invoice.yourCompanyInfo.email))\"\n"
+            csvContent += "Numéro de TVA,\"\(escapeCSVField(invoice.yourCompanyInfo.vatNumber))\"\n"
+            
+            return csvContent
+        } catch {
+            throw InvoiceExportError.csvGenerationFailed
+        }
+    }
+    
+    // Échapper les caractères spéciaux pour le CSV
+    private func escapeCSVField(_ field: String) -> String {
+        // Remplacer les guillements par des doubles guillements
+        var escaped = field.replacingOccurrences(of: "\"", with: "\"\"")
+        // Remplacer les retours à la ligne par des espaces
+        escaped = escaped.replacingOccurrences(of: "\n", with: " ")
+        return escaped
+    }
+    
+    // MARK: - Sauvegarder les fichiers
+    
+    func saveInvoiceFiles(invoice: Invoice) async throws -> (pdfURL: URL, csvURL: URL) {
+        do {
+            // Créer un répertoire temporaire pour les fichiers
+            let tempDirectory = FileManager.default.temporaryDirectory
+            
+            // Générer le PDF
+            let pdfData = try exportToPDF(invoice: invoice)
+            let pdfFilename = "Facture_\(invoice.invoiceNumber)_\(dateManager.formatDate(Date(), for: .csv)).pdf"
+            let pdfURL = tempDirectory.appendingPathComponent(pdfFilename)
+            
+            // Écrire le PDF
+            try pdfData.write(to: pdfURL)
+            
+            // Générer le CSV
+            let csvContent = try exportToCSV(invoice: invoice)
+            let csvFilename = "Facture_\(invoice.invoiceNumber)_\(dateManager.formatDate(Date(), for: .csv)).csv"
+            let csvURL = tempDirectory.appendingPathComponent(csvFilename)
+            
+            // Écrire le CSV
+            try csvContent.write(to: csvURL, atomically: true, encoding: .utf8)
+            
+            return (pdfURL, csvURL)
+        } catch {
+            if let invoiceError = error as? InvoiceExportError {
+                throw invoiceError
+            } else {
+                throw InvoiceExportError.fileWriteFailed
+            }
+        }
+    }
+    
+    // MARK: - Fonction pour récupérer uniquement le PDF
+    
+    func generatePDFData(invoice: Invoice) throws -> Data {
+        return try exportToPDF(invoice: invoice)
+    }
+    
+    // MARK: - Fonction pour récupérer uniquement le CSV
+    
+    func generateCSVString(invoice: Invoice) throws -> String {
+        return try exportToCSV(invoice: invoice)
+    }
+    
+    // MARK: - Partager les fichiers
+    
+    func shareInvoice(from viewController: UIViewController, pdfURL: URL, csvURL: URL) {
+        // Créer un tableau d'éléments à partager
+        var itemsToShare: [Any] = []
+        
+        // Ajouter le PDF
+        itemsToShare.append(pdfURL)
+        
+        // Ajouter le CSV
+        itemsToShare.append(csvURL)
+        
+        // Créer le contrôleur de partage
+        let activityViewController = UIActivityViewController(activityItems: itemsToShare, applicationActivities: nil)
+        
+        // Sur iPad, présenter le contrôleur de partage en tant que popover
+        if let popoverController = activityViewController.popoverPresentationController {
+            popoverController.sourceView = viewController.view
+            popoverController.sourceRect = CGRect(x: viewController.view.bounds.midX, y: viewController.view.bounds.midY, width: 0, height: 0)
+            popoverController.permittedArrowDirections = []
+        }
+        
+        // Présenter le contrôleur de partage
+        viewController.present(activityViewController, animated: true, completion: nil)
+    }
+}
+
+// MARK: - Manager pour l'utilisation des fonctionnalités
+
+class InvoiceManager {
+    private let exporter = InvoiceExporter()
+    
+    func createAndExportSampleInvoice(from viewController: UIViewController) async {
+        // Créer une facture de test
+        let invoiceItems = [
+            InvoiceItem(description: "Développement d'application iOS", quantity: 1, unitPrice: 2500.0, vatRate: 0.20),
+            InvoiceItem(description: "Maintenance mensuelle", quantity: 3, unitPrice: 500.0, vatRate: 0.20),
+            InvoiceItem(description: "Formation Swift (journée)", quantity: 2, unitPrice: 800.0, vatRate: 0.20)
+        ]
+        
+        let companyInfo = CompanyInfo(
+            name: "Votre Entreprise SAS",
+            address: "123 rue Principale",
+            postalCode: "75000",
+            city: "Paris",
+            phone: "01 23 45 67 89",
+            email: "contact@entreprise.com",
+            vatNumber: "FR 12 345 678 901"
+        )
+        
+        let invoice = Invoice(
+            invoiceNumber: "F-2025-001",
+            dateIssued: Date(),
+            dueDate: Calendar.current.date(byAdding: .day, value: 30, to: Date())!,
+            clientName: "Société ABC",
+            clientAddress: "123 rue Principale\n75000 Paris\nFrance",
+            items: invoiceItems,
+            taxRate: 0.20, // TVA 20%
+            yourCompanyInfo: companyInfo
+        )
+        
+        // Exporter la facture
+        do {
+            let (pdfURL, csvURL) = try await exporter.saveInvoiceFiles(invoice: invoice)
+            
+            // Partager les fichiers
+            exporter.shareInvoice(from: viewController, pdfURL: pdfURL, csvURL: csvURL)
+        } catch let error as InvoiceExportError {
+            self.showErrorAlert(message: error.localizedDescription, on: viewController)
+        } catch {
+            self.showErrorAlert(message: "Une erreur inattendue s'est produite", on: viewController)
+        }
+    }
+    
+    // Afficher une alerte d'erreur
+    private func showErrorAlert(message: String, on viewController: UIViewController) {
+        let alert = UIAlertController(
+            title: "Erreur",
+            message: message,
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        viewController.present(alert, animated: true)
+    }
+}
+
+// MARK: - Extension FileManager pour la gestion des documents
+
+extension FileManager {
+    func getDocumentsDirectory() -> URL {
+        let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+        return paths[0]
+    }
+    
+    func ensureDirectoryExists(at url: URL) throws {
+        var isDirectory: ObjCBool = false
+        
+        if fileExists(atPath: url.path, isDirectory: &isDirectory) {
+            if !isDirectory.boolValue {
+                try removeItem(at: url)
+                try createDirectory(at: url, withIntermediateDirectories: true)
+            }
+        } else {
+            try createDirectory(at: url, withIntermediateDirectories: true)
+        }
+    }
+}
+
+// MARK: - Exemple d'utilisation dans une ViewController
+
+class InvoiceViewController: UIViewController {
+    
+    private let invoiceManager = InvoiceManager()
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        // Configuration de l'interface utilisateur
+        setupUI()
+    }
+    
+    private func setupUI() {
+        view.backgroundColor = .white
+        
+        let generateButton = UIButton(type: .system)
+        generateButton.setTitle("Générer une facture d'exemple", for: .normal)
+        generateButton.addTarget(self, action: #selector(generateInvoice), for: .touchUpInside)
+        
+        view.addSubview(generateButton)
+        generateButton.translatesAutoresizingMaskIntoConstraints = false
+        
+        NSLayoutConstraint.activate([
+            generateButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            generateButton.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+        ])
+    }
+    
+    @objc private func generateInvoice() {
+        Task {
+            await invoiceManager.createAndExportSampleInvoice(from: self)
+        }
+    }
+}
